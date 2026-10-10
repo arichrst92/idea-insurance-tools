@@ -466,10 +466,16 @@ export const kasKantor = pgTable(
     keterangan: text(),
     buktiDokumenId: text(),
     sumber: sumberKasEnum().notNull().default("manual"),
+    /** Entri otomatis gaji: target yang dibayar */
+    targetSalesId: text(),
     dibuatOleh: text().references(() => users.id),
     dibuat: dibuat(),
   },
-  (t) => [index().on(t.tanggal)],
+  (t) => [
+    index().on(t.tanggal),
+    // Satu entri otomatis per polis per kategori (mis. premi masuk) — aksi yang diulang tidak mencatat dobel.
+    uniqueIndex("kas_polis_kategori_unik").on(t.polisId, t.kategori).where(sql`${t.polisId} is not null`),
+  ],
 );
 
 export const batchTransfer = pgTable("batch_transfer", {
@@ -499,8 +505,16 @@ export const jadwalBayar = pgTable(
     tglJadwal: tanggal().notNull(),
     status: statusJadwalBayarEnum().notNull().default("terjadwal"),
     batchId: text().references(() => batchTransfer.id),
+    /** Gaji: nominal masih estimasi (tutup buku belum dijalankan) */
+    estimasi: boolean().notNull().default(false),
+    dibayar: tanggal(),
+    diubah: dibuat().$onUpdate(() => new Date()),
   },
-  (t) => [index().on(t.tglJadwal)],
+  (t) => [
+    index().on(t.tglJadwal),
+    uniqueIndex("jadwal_polis_unik").on(t.jenis, t.polisId).where(sql`${t.polisId} is not null`),
+    uniqueIndex("jadwal_target_unik").on(t.jenis, t.targetSalesId).where(sql`${t.targetSalesId} is not null`),
+  ],
 );
 
 // ───────────────────────── Klaim & dokumen ─────────────────────────

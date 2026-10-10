@@ -78,6 +78,13 @@
       "when": 1791629604629,
       "tag": "0010_kirim_jenis",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1791630972797,
+      "tag": "0011_keuangan_jadwal",
+      "breakpoints": true
     }
   ]
 }

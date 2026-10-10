@@ -32,6 +32,7 @@ import { parsePersen, parseRupiah, rupiah } from "@/lib/format";
 import { escapeHtml, kirimEmail, type Lampiran } from "@/lib/email";
 import { isiTemplate, kirimPesan } from "@/lib/pesan";
 import { buatLinkUnduh } from "@/lib/unduh";
+import { kasOtomatis, transferPolis } from "@/lib/keuangan";
 import { linkWaMe } from "@/lib/wa";
 import {
   TransisiTidakSah,
@@ -620,7 +621,7 @@ export async function tandaiLunas(id: string, _: StateForm, f: FormData): Promis
   }
 
   return jalankan(async () => {
-    await simpanDokumenPolis(f, "bukti", id, "bukti_bayar_nasabah", user.id);
+    const buktiId = await simpanDokumenPolis(f, "bukti", id, "bukti_bayar_nasabah", user.id);
     await db.transaction(async (tx) => {
       if (p.statusPengajuan === "polis_terbit")
         await ubahStatus(tx, { polisId: id, ke: "menunggu_bayar", oleh: user.id, catatan: "Dibayar sebelum instruksi dikirim" });
@@ -630,6 +631,16 @@ export async function tandaiLunas(id: string, _: StateForm, f: FormData): Promis
         oleh: user.id,
         catatan: `Dibayar ${tgl}`,
         patch: { statusBayar: "lunas", tglBayar: tgl, statusMasa: "aktif" },
+      });
+      await kasOtomatis(tx, {
+        polisId: id,
+        kategori: "premi_masuk",
+        nominal: p.premiBruto,
+        tanggal: tgl,
+        rekeningId: p.rekeningPembayaranId,
+        keterangan: `Premi ${p.noPolis ?? p.kode}`,
+        oleh: user.id,
+        buktiDokumenId: buktiId,
       });
     });
     try {
@@ -647,13 +658,14 @@ export async function tandaiLunas(id: string, _: StateForm, f: FormData): Promis
 
 export async function catatSetor(id: string, _: StateForm, f: FormData): Promise<StateForm> {
   const { user } = await wajibLogin("admin");
-  await polisMilik(user, id);
+  const p = await polisMilik(user, id);
   const tgl = teks(f, "tglSetor");
   if (!tgl) return { error: "Isi tanggal setor" };
   return jalankan(async () => {
-    await db.transaction((tx) =>
-      ubahStatus(tx, { polisId: id, ke: "premi_disetor", oleh: user.id, catatan: `Disetor ${tgl}`, patch: { tglSetorAsuransi: tgl } }),
-    );
+    await db.transaction(async (tx) => {
+      await ubahStatus(tx, { polisId: id, ke: "premi_disetor", oleh: user.id, catatan: `Disetor ${tgl}`, patch: { tglSetorAsuransi: tgl } });
+      await kasOtomatis(tx, { polisId: id, kategori: "setor_premi", nominal: p.premiBruto, tanggal: tgl, keterangan: `Setor premi ${p.noPolis ?? p.kode}`, oleh: user.id });
+    });
     segarkan(id);
     return { ok: "Setoran premi dicatat" };
   });
@@ -661,22 +673,23 @@ export async function catatSetor(id: string, _: StateForm, f: FormData): Promise
 
 export async function catatCair(id: string, _: StateForm, f: FormData): Promise<StateForm> {
   const { user } = await wajibLogin("admin");
-  await polisMilik(user, id);
+  const p = await polisMilik(user, id);
   const tgl = teks(f, "tglCair");
   const nominal = parseRupiah(teks(f, "nominal"));
   if (!tgl) return { error: "Isi tanggal cair" };
   if (Number.isNaN(nominal) || nominal <= 0) return { error: "Isi nominal cashback yang cair" };
   return jalankan(async () => {
-    await simpanDokumenPolis(f, "bukti", id, "bukti_cair_asuransi", user.id);
-    await db.transaction((tx) =>
-      ubahStatus(tx, {
+    const buktiId = await simpanDokumenPolis(f, "bukti", id, "bukti_cair_asuransi", user.id);
+    await db.transaction(async (tx) => {
+      await ubahStatus(tx, {
         polisId: id,
         ke: "cashback_cair",
         oleh: user.id,
         catatan: `Dana asuransi cair ${tgl}`,
         patch: { tglCairAsuransi: tgl, nominalCairAsuransi: nominal },
-      }),
-    );
+      });
+      await kasOtomatis(tx, { polisId: id, kategori: "dana_asuransi", nominal, tanggal: tgl, keterangan: `Cashback cair ${p.noPolis ?? p.kode}`, oleh: user.id, buktiDokumenId: buktiId });
+    });
     segarkan(id);
     return { ok: "Pencairan dicatat" };
   });
@@ -694,39 +707,7 @@ export async function catatTransfer(id: string, jenis: "nasabah" | "sales", _: S
 
   return jalankan(async () => {
     const buktiId = await simpanDokumenPolis(f, "bukti", id, jenis === "nasabah" ? "bukti_transfer_cashback_nasabah" : "bukti_transfer_komisi", user.id);
-    const patch = jenis === "nasabah" ? { tglTransferNasabah: tgl } : { tglTransferSales: tgl };
-    const [baru] = await db.update(polis).set(patch).where(eq(polis.id, id)).returning();
-    await db.insert(statusHistory).values({
-      polisId: id,
-      status: baru.statusPengajuan,
-      oleh: user.id,
-      catatan: jenis === "nasabah" ? `Cashback nasabah ditransfer ${tgl}` : `Komisi sales ditransfer ${tgl}`,
-    });
-    if (baru.statusPengajuan === "cashback_cair" && baru.tglTransferNasabah && baru.tglTransferSales) {
-      await db.transaction((tx) => ubahStatus(tx, { polisId: id, ke: "selesai", oleh: user.id, catatan: "Cashback nasabah & komisi sales sudah ditransfer" }));
-    }
-    if (jenis === "nasabah") {
-      try {
-        const { baris, vars } = await varsPesanNasabah(id);
-        const [r] = await db
-          .select()
-          .from(rekening)
-          .where(and(eq(rekening.pemilikTipe, "nasabah"), eq(rekening.pemilikId, baris.n.id), eq(rekening.utama, true)));
-        let isi = await isiTemplate("cashback_ditransfer", { ...vars, rekening_nasabah: r ? `${r.namaBank} ${r.noRekening}` : "rekening Bapak/Ibu" });
-        // Template menyebut bukti terlampir; tanpa bukti, kalimat itu dihapus.
-        if (!buktiId) isi = isi.replace(/\s*Bukti transfer terlampir\.?/i, "");
-        await kirimPesan({
-          ke: baris.n.noWa,
-          isi,
-          jenis: "notifikasi",
-          polisId: id,
-          userId: user.id,
-          ...(buktiId ? { lampiranUrl: await buatLinkUnduh(buktiId, 30), namaLampiran: "Bukti transfer cashback" } : {}),
-        });
-      } catch (e) {
-        console.error("[pesan cashback]", e);
-      }
-    }
+    await transferPolis(id, jenis, { tgl, oleh: user.id, buktiDokumenId: buktiId });
     segarkan(id);
     return { ok: "Transfer dicatat" };
   });

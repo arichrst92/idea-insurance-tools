@@ -238,3 +238,53 @@ describe("periode laporan", () => {
     expect(rasio(1, 0)).toBe(0);
   });
 });
+
+import { formatRibuan, parseRupiah, posisiKursor } from "../format";
+
+describe("input rupiah", () => {
+  it.each([
+    ["", ""],
+    ["0", "0"],
+    ["1500", "1.500"],
+    ["1500000", "1.500.000"],
+    ["1.5000.00", "1.500.000"],
+    ["Rp 6.000.000", "6.000.000"],
+    ["007500", "7.500"],
+  ])("%s → %s", (a, b) => expect(formatRibuan(a)).toBe(b));
+  it("kursor tetap di belakang digit yang sama", () => {
+    // ketik "5" di belakang "1.50|0.000" → "15.000.000"? kursor setelah digit ke-3
+    expect(posisiKursor("1.500.000", 3)).toBe(4);
+    expect(posisiKursor("1.500.000", 0)).toBe(0);
+    expect(posisiKursor("1.500.000", 99)).toBe(9);
+  });
+  it("hasil format terbaca server", () => expect(parseRupiah(formatRibuan("185000000"))).toBe(185000000));
+});
+
+import { csvTransfer, hariBayarBerikutnya, sesamaBca, tambahHariKerja, tanggalGajian } from "./jadwal";
+
+describe("jadwal bayar", () => {
+  it("hari kerja", () => {
+    expect(tambahHariKerja("2026-10-08", 3)).toBe("2026-10-13"); // Kamis + 3 hk → Selasa
+    expect(tambahHariKerja("2026-10-10", 1)).toBe("2026-10-12"); // Sabtu → Senin
+  });
+  it("Jumat berikutnya (atau hari itu juga)", () => {
+    expect(hariBayarBerikutnya("2026-10-07")).toBe("2026-10-09");
+    expect(hariBayarBerikutnya("2026-10-09")).toBe("2026-10-09");
+    expect(hariBayarBerikutnya("2026-10-10")).toBe("2026-10-16");
+  });
+  it("tanggal gajian mundur ke hari kerja", () => {
+    expect(tanggalGajian("2026-09-01")).toBe("2026-10-01"); // Kamis
+    expect(tanggalGajian("2026-10-01")).toBe("2026-10-30"); // 1 Nov Minggu → Jumat 30 Okt
+    expect(tanggalGajian("2026-12-01")).toBe("2027-01-01");
+  });
+  it("sesama BCA", () => {
+    expect(sesamaBca({ kodeBank: "014", namaBank: "x" })).toBe(true);
+    expect(sesamaBca({ kodeBank: null, namaBank: "BCA" })).toBe(true);
+    expect(sesamaBca({ kodeBank: "008", namaBank: "Mandiri" })).toBe(false);
+  });
+  it("CSV transfer", () => {
+    const rows = [{ noRekening: "555-000-1111", atasNama: "Rina, Kartika", nominal: 700000, berita: "Komisi Okt #12", kodeBank: "014" }];
+    expect(csvTransfer("sesama_bca", rows)).toBe('No Rekening Tujuan,Nama Penerima,Nominal,Berita\r\n5550001111,"Rina, Kartika",700000,Komisi Okt 12\r\n');
+    expect(csvTransfer("antarbank", [{ ...rows[0], kodeBank: "008" }]).split("\r\n")[1]).toBe('5550001111,"Rina, Kartika",008,700000,Komisi Okt 12');
+  });
+});

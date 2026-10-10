@@ -43,7 +43,7 @@ export function Kartu({ className, ...p }: ComponentProps<"section">) {
   return <section {...p} className={clsx("rounded-[20px] border border-line bg-white p-5", className)} />;
 }
 
-const kelasInput =
+export const kelasInput =
   "h-11 w-full rounded-xl border border-line-2 bg-white px-3.5 text-[15px] text-ink outline-none placeholder:text-ink-4 focus:border-brand focus:ring-4 focus:ring-brand-soft";
 
 export function Isian({

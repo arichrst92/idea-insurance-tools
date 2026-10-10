@@ -32,6 +32,7 @@ import { bagiHasilBerlaku } from "@/lib/domain/komisi";
 import { persen, rupiah } from "@/lib/format";
 import { cekKelengkapan, trackerAktif, urlTracker, MIN_FOTO_KENDARAAN } from "@/lib/pengajuan";
 import { PilihPenawaran } from "./pilih-penawaran";
+import { IsianRupiah } from "@/components/isian-rupiah";
 import { siapkanOpsi } from "./opsi-penawaran";
 import { DOK_KHUSUS_ADMIN } from "@/lib/akses";
 import { RincianKomisi } from "@/components/rincian-komisi";
@@ -289,10 +290,9 @@ export default async function DetailPengajuan({ params }: { params: Promise<{ id
         </summary>
         <div className="pt-4">
           <FormAksi aksi={simpanNilaiPertanggungan.bind(null, id)} tombol="Simpan nilai pertanggungan" varian="kedua">
-            <Isian
-              label="Nilai pertanggungan / TSI (Rp)"
+            <IsianRupiah
+              label="Nilai pertanggungan / TSI"
               name="nilaiPertanggungan"
-              inputMode="numeric"
               placeholder="415.000.000"
               defaultValue={p.nilaiPertanggungan ?? ""}
               hint="Sesuai taksiran asuransi. Wajib diisi sebelum polis diterbitkan."
@@ -475,7 +475,7 @@ export default async function DetailPengajuan({ params }: { params: Promise<{ id
             <FormAksi aksi={catatCair.bind(null, id)} tombol="Catat pencairan" varian="kedua">
               <div className="grid gap-3 sm:grid-cols-2">
                 <Isian label="Tanggal cair" name="tglCair" type="date" required defaultValue={hariIni()} />
-                <Isian label="Nominal cair (Rp)" name="nominal" inputMode="numeric" required defaultValue={p.cashbackTotalRp ?? ""} />
+                <IsianRupiah label="Nominal cair" name="nominal" required defaultValue={p.cashbackTotalRp ?? ""} />
               </div>
               <InputFile label="Bukti (opsional)" name="bukti" />
             </FormAksi>
@@ -611,7 +611,7 @@ export default async function DetailPengajuan({ params }: { params: Promise<{ id
                                       </option>
                                     ))}
                                 </Pilihan>
-                                <Isian label="Premi (Rp)" name="premi" inputMode="numeric" defaultValue={String(pw.premi)} required />
+                                <IsianRupiah label="Premi" name="premi" defaultValue={pw.premi} required />
                                 <Isian label="Cashback total (%)" name="cashbackTotalPersen" inputMode="decimal" defaultValue={String(pw.cashbackTotalPersen)} required />
                               </div>
                               <Isian label="Catatan internal (tidak terlihat sales)" name="catatan" defaultValue={pw.catatan ?? ""} />

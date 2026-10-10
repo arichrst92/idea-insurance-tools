@@ -1,5 +1,6 @@
 "use client";
 
+import { InputRupiah } from "@/components/isian-rupiah";
 import { useState } from "react";
 import Link from "next/link";
 import { FormAksi, type StateForm } from "@/components/form-aksi";
@@ -49,7 +50,7 @@ export function FormPenawaran({ aksi, asuransi }: { aksi: (s: StateForm, f: Form
             {a.paket.map((k) => (
               <label key={k.id} className="grid grid-cols-[110px_1fr] items-center gap-3 text-sm">
                 <span className="font-semibold">{k.nama}</span>
-                <input name={`premi_${k.id}`} inputMode="numeric" placeholder="Kosongkan bila tidak ditawarkan" className={kelasInput} />
+                <InputRupiah name={`premi_${k.id}`} placeholder="Kosongkan bila tidak ditawarkan" />
               </label>
             ))}
           </fieldset>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { IsianRupiah } from "@/components/isian-rupiah";
 import { FormAksi, type StateForm } from "@/components/form-aksi";
 import { Isian, Pilihan } from "@/components/ui";
 import { hitungKomisi, porsiKantorDenganEvent } from "@/lib/domain/komisi";
@@ -125,15 +126,14 @@ export function FormSales({
         <fieldset className="grid gap-4 sm:grid-cols-2">
           <legend className="mb-3 text-base font-bold">Target bulan ini & gaji</legend>
           <Isian label="Target case / bulan" name="targetCase" type="number" min={1} defaultValue={awal.targetCase} required />
-          <Isian label="Target revenue premi / bulan (Rp)" name="targetRevenue" inputMode="numeric" defaultValue={awal.targetRevenue} required />
+          <IsianRupiah label="Target revenue premi / bulan" name="targetRevenue" defaultValue={awal.targetRevenue} required />
           <Pilihan label="Target utama (penentu achieve & gaji)" name="targetUtama" defaultValue={awal.targetUtama}>
             <option value="revenue">Revenue</option>
             <option value="case">Case</option>
           </Pilihan>
-          <Isian
-            label="Gaji pokok / bulan (Rp)"
+          <IsianRupiah
+            label="Gaji pokok / bulan"
             name="gajiPokok"
-            inputMode="numeric"
             defaultValue={awal.gajiPokok}
             hint="Dibayar = gaji × min(100%, pencapaian × 2)"
             required

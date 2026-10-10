@@ -75,6 +75,7 @@ const OTOMASI = [
   { kode: "rekap_komisi", nama: "Rekap komisi siap bayar", jadwalCron: "0 10 * * 5", parameter: {} },
   { kode: "laporan_berkala", nama: "Laporan berkala", jadwalCron: "0 7 * * 1", parameter: { bulanan: true } },
   { kode: "tutup_buku_target", nama: "Tutup buku target", jadwalCron: "30 0 1 * *", parameter: {} },
+  { kode: "jadwal_bayar", nama: "Aturan jadwal bayar", jadwalCron: "event:pengaturan", parameter: { hariKerjaCashback: 3, hariBayarKomisi: 5, tglGajian: 1 } },
   { kode: "kirim_otomatis_asuransi", nama: "Kirim otomatis ke asuransi", jadwalCron: "event:data_lengkap", parameter: {}, aktif: false },
 ];
 
