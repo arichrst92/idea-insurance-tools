@@ -4,14 +4,19 @@ import { db } from "@/db";
 import { otomasiLog, otomasiSetting } from "@/db/schema";
 import { cocokCron, waktuWib } from "@/lib/domain/perpanjangan";
 import { jobDraftPerpanjangan, jobRemindPerpanjangan } from "@/lib/perpanjangan";
+import { jobAlertMandek, jobRekapKomisi, jobTagihCashback, jobTutupBukuTarget } from "@/lib/otomasi-jobs";
 
 type Hasil = { jumlah: number; ringkasan: string };
 type Job = (param: Record<string, unknown>) => Promise<Hasil>;
 
-/** Otomasi yang sudah dibangun. Sisanya (alert mandek, laporan, …) menyusul di sprint 5–6. */
+/** Otomasi yang sudah dibangun. Laporan berkala & kirim otomatis ke asuransi menyusul di Sprint 6. */
 export const JOB: Record<string, Job> = {
   draft_perpanjangan: (p) => jobDraftPerpanjangan(p as { hariSebelum?: number }),
   remind_perpanjangan: (p) => jobRemindPerpanjangan(p as { hari?: number[] }),
+  alert_mandek: (p) => jobAlertMandek(p as { hari?: number; hariCepat?: number; eskalasiAdmin?: number }),
+  tagih_cashback: (p) => jobTagihCashback(p as { jedaHari?: number }),
+  rekap_komisi: () => jobRekapKomisi(),
+  tutup_buku_target: () => jobTutupBukuTarget(),
 };
 
 /** Jalankan satu otomasi dan catat hasilnya di otomasi_log. */

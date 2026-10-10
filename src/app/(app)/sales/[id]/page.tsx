@@ -46,6 +46,11 @@ export default async function EditSales({
         }
         aksi={
           u.role === "sales" && u.id !== sesi.user.id ? (
+            <>
+            <Link href={`/performa/${id}`} className="inline-flex h-10 items-center rounded-full border border-line-2 bg-white px-5 text-sm font-semibold">
+              Performa
+            </Link>
+            {
             u.aktif ? (
               <Link
                 href={`/sales/${id}/nonaktifkan`}
@@ -57,7 +62,8 @@ export default async function EditSales({
               <form action={aktifkanSales.bind(null, id)}>
                 <Tombol varian="kedua">Aktifkan kembali</Tombol>
               </form>
-            )
+            )}
+            </>
           ) : undefined
         }
       />

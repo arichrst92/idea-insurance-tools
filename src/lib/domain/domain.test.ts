@@ -215,3 +215,26 @@ describe("perpanjangan", () => {
     expect(maksudBalasan("ya nanti saya kabari")).toBeNull();
   });
 });
+
+import { geserBulan, periode, rasio } from "./periode";
+
+describe("periode laporan", () => {
+  it("bulan ini / lalu / kuartal / tahun", () => {
+    expect(periode("bulan_ini", "2026-10-10")).toMatchObject({ dari: "2026-10-01", sampai: "2026-10-31" });
+    expect(periode("bulan_lalu", "2026-01-15")).toMatchObject({ dari: "2025-12-01", sampai: "2025-12-31" });
+    expect(periode("bulan_lalu", "2026-03-05")).toMatchObject({ dari: "2026-02-01", sampai: "2026-02-28" });
+    expect(periode("kuartal_ini", "2026-10-10")).toMatchObject({ dari: "2026-10-01", sampai: "2026-12-31", label: "Kuartal 4 2026" });
+    expect(periode("tahun_ini", "2026-10-10")).toMatchObject({ dari: "2026-01-01", sampai: "2026-12-31" });
+  });
+  it("kustom tidak valid → bulan ini", () => {
+    expect(periode("kustom", "2026-10-10", "2026-09-01", "2026-09-15").kode).toBe("kustom");
+    expect(periode("kustom", "2026-10-10", "2026-09-20", "2026-09-01").kode).toBe("bulan_ini");
+    expect(periode("kustom", "2026-10-10", "x", "y").kode).toBe("bulan_ini");
+  });
+  it("geser bulan & rasio", () => {
+    expect(geserBulan("2026-01-01", -1)).toBe("2025-12-01");
+    expect(geserBulan("2026-11-01", 2)).toBe("2027-01-01");
+    expect(rasio(2, 3)).toBe(66.7);
+    expect(rasio(1, 0)).toBe(0);
+  });
+});

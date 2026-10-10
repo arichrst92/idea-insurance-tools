@@ -123,7 +123,7 @@ export default async function DetailPengajuan({ params }: { params: Promise<{ id
         .select({ l: kirimAsuransiLog, asuransi: perusahaanAsuransi.nama })
         .from(kirimAsuransiLog)
         .innerJoin(perusahaanAsuransi, eq(perusahaanAsuransi.id, kirimAsuransiLog.perusahaanId))
-        .where(eq(kirimAsuransiLog.polisId, id))
+        .where(and(eq(kirimAsuransiLog.polisId, id), admin ? undefined : eq(kirimAsuransiLog.jenis, "data")))
         .orderBy(desc(kirimAsuransiLog.waktu)),
       db
         .select()
@@ -930,7 +930,7 @@ export default async function DetailPengajuan({ params }: { params: Promise<{ id
               {kirimLog.map(({ l, asuransi }) => (
                 <li key={l.id} className="flex flex-col border-l-2 border-brand-edge pl-3">
                   <span>
-                    Kirim ke <b>{asuransi}</b> via {l.kanal === "wa" ? "WhatsApp" : "email"} · {tglJam(l.waktu)}
+                    {l.jenis === "tagih_cashback" ? "Tagih pencairan ke" : "Kirim ke"} <b>{asuransi}</b> via {l.kanal === "wa" ? "WhatsApp" : "email"} · {tglJam(l.waktu)}
                   </span>
                   <span className="text-ink-3">
                     {l.tujuan} · {l.hasil}

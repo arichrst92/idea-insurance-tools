@@ -71,6 +71,13 @@
       "when": 1791627903530,
       "tag": "0009_batal_salah_input",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1791629604629,
+      "tag": "0010_kirim_jenis",
+      "breakpoints": true
     }
   ]
 }

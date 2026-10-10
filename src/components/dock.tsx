@@ -24,6 +24,7 @@ import {
   UserCog,
   Sparkles,
   LogOut,
+  Bell,
   type LucideIcon,
 } from "lucide-react";
 
@@ -51,7 +52,7 @@ const ITEMS: Item[] = [
   { href: "/sales", label: "Sales", ikon: UserCog, admin: true },
 ];
 
-export function Dock({ role, nama }: { role: "admin" | "sales"; nama: string }) {
+export function Dock({ role, nama, belumDibaca = 0 }: { role: "admin" | "sales"; nama: string; belumDibaca?: number }) {
   const path = usePathname();
   const aktif = (href: string) => (href === "/" ? path === "/" : path === href || path.startsWith(href + "/"));
   const umum = ITEMS.filter((i) => !i.admin);
@@ -70,6 +71,9 @@ export function Dock({ role, nama }: { role: "admin" | "sales"; nama: string }) 
           ))}
         </nav>
         <span aria-hidden className="mb-5 mt-3 w-px shrink-0 self-stretch bg-[#E0E3EC]" />
+        <div className="shrink-0 pb-1.5 pl-1 pt-2.5">
+          <DockItem item={{ href: "/notifikasi", label: "Notifikasi", ikon: Bell, badge: belumDibaca }} aktif={aktif("/notifikasi")} />
+        </div>
         <Akun nama={nama} role={role} />
       </div>
     </div>
@@ -155,7 +159,7 @@ function DockItem({ item, aktif }: { item: Item; aktif: boolean }) {
         <Ikon size={22} strokeWidth={1.8} aria-hidden />
         {item.badge ? (
           <span className="absolute -right-2 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-white bg-brand px-1 text-[11px] font-bold text-white">
-            {item.badge}
+            {item.badge > 99 ? "99+" : item.badge}
           </span>
         ) : null}
       </span>

@@ -85,6 +85,7 @@ src/
       nasabah/        Nasabah, kendaraan, dokumen, rekening cashback
       pengajuan/      Journey 12 langkah, kirim ke asuransi, penawaran, polis, pembayaran
       polis/, event/  Daftar polis terbit, event bagi hasil
+      laporan/, performa/, pencairan/, notifikasi/
       perpanjangan/   Polis akan habis, remind & perpanjang
       klaim/          Catat klaim + foto, status
       verifikasi/     OTP ulang untuk tindakan sensitif (> 12 jam)
@@ -95,7 +96,8 @@ src/
   lib/auth/           OTP, sesi, hash
   lib/fonnte.ts       Klien WhatsApp Fonnte
   lib/wa-masuk.ts     Balasan nasabah (YA / BERHENTI / bukti transfer) dari webhook Fonnte
-  lib/otomasi.ts      Otomasi terjadwal + log; penjadwal di instrumentation.ts
+  lib/otomasi.ts      Otomasi terjadwal + log; penjadwal di instrumentation.ts (job di otomasi-jobs.ts)
+  lib/laporan.ts      Definisi angka laporan (penjualan = tanggal polis terbit), dipakai juga oleh Excel & dashboard
   middleware.ts       Arahkan tamu ke /login, perpanjang cookie "ingat perangkat"
 ```
 
@@ -105,6 +107,6 @@ src/
 - [x] **Sprint 2 — Nasabah & kendaraan**: daftar + cari (nama, no. WA, plat) + filter, tambah/ubah nasabah & kendaraan, data dibatasi per sales, upload KTP/STNK/foto (filesystem privat, lewat /api/dokumen), rekening cashback nasabah, tandai kendaraan dijual/tidak dipakai, pindah kepemilikan, nonaktifkan/aktifkan sales + pengalihan nasabah
 - [x] **Sprint 3 — Pengajuan, polis & cashback**: journey 12 status + riwayat (nilai pertanggungan diisi admin dari taksiran asuransi di langkah 3; pembatalan karena salah input oleh sales/admin sebelum polis terbit), cek kelengkapan dokumen, kirim data ke asuransi (email SendGrid + WhatsApp Fonnte ke PIC master), penawaran, persetujuan nasabah + hitung komisi (event otomatis, komisi dasar & tambahan event dipisah), polis terbit + PDF, instruksi bayar dengan PDF terlampir (cadangan wa.me), lunas + bukti, setor/cair/transfer → selesai, revisi/tolak/batal, notifikasi giliran sales, event bagi hasil, daftar polis, link tracker nasabah publik (/t): nasabah memilih paket coverage dari penawaran, upload bukti transfer (dilihat sales/admin untuk ditandai lunas), unduh PDF dengan 4 digit WA
 - [x] **Sprint 4 — Perpanjangan & klaim**: halaman polis akan habis (H-7/14/30/45, lewat masa), remind WhatsApp otomatis H-30/H-14/H-7 + tombol remind manual dengan status pesan (terkirim/diterima/dibaca), draft perpanjangan otomatis H-45, perpanjang dari polis lama (polis lama jadi "diperpanjang" saat perpanjangan terbit), balasan nasabah via webhook Fonnte (YA = setuju perpanjangan, BERHENTI = stop remind, foto = bukti transfer, lainnya diteruskan ke sales), catat klaim + foto + status, ringkasan di dashboard
-- [ ] Sprint 5 — Laporan & pencairan
+- [x] **Sprint 5 — Laporan & pencairan**: dashboard (premi, polis, komisi/cashback, akan habis, klaim, tertunggak, giliran), laporan per periode/sales/asuransi/paket + renewal rate + klaim + ekspor Excel (versi sales tanpa angka asuransi), performa vs target + top 3 + peringkat sales + detail sales (progress, estimasi gaji, riwayat 12 bulan, bulan achieve), pencairan per tahap + lewat termin + rekap komisi siap bayar (CSV), otomasi alert mandek / tagih cashback / rekap komisi / tutup buku target + gaji prorata, notifikasi in-app (lonceng)
 - [ ] Sprint 6 — Keuangan & ekspor PDF
 - [ ] Sprint 7 — UAT & go-live

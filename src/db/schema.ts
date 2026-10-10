@@ -424,6 +424,8 @@ export const kirimAsuransiLog = pgTable("kirim_asuransi_log", {
     .references(() => perusahaanAsuransi.id),
   kontakId: text().references(() => kontakAsuransi.id),
   kanal: kanalKirimEnum().notNull(),
+  /** data = kirim data pengajuan; tagih_cashback = pengingat penagihan dana ke asuransi */
+  jenis: text().notNull().default("data"),
   tujuan: text().notNull(),
   lampiran: text().array().notNull().default(sql`'{}'`),
   hasil: hasilKirimEnum().notNull(),

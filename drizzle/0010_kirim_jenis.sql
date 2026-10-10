@@ -1,0 +1,1 @@
+ALTER TABLE "kirim_asuransi_log" ADD COLUMN "jenis" text DEFAULT 'data' NOT NULL;
