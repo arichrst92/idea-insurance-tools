@@ -24,7 +24,7 @@ ADMIN_NAMA="Nama Anda" ADMIN_NO_WA=0812xxxxxxx npm run db:seed
 npm run dev                          # http://localhost:3000
 ```
 
-Tanpa `FONNTE_TOKEN`, kode OTP dicetak di terminal `npm run dev`, jadi login bisa dicoba tanpa WhatsApp.
+Dengan `OTP_BYPASS=1` (bawaan `.env.example`) login cukup dengan nomor terdaftar, tanpa kode. Set `OTP_BYPASS=0` untuk menguji OTP: tanpa `FONNTE_TOKEN` kodenya dicetak di terminal `npm run dev`. Bypass selalu mati di production.
 
 ## Perintah
 

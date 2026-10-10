@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { sesiSekarang } from "@/lib/auth/session";
+import { otpDibypass } from "@/lib/auth/bypass";
 import { FormLogin } from "./form-login";
 
 export const metadata: Metadata = { title: "Masuk" };
@@ -23,7 +24,12 @@ export default async function HalamanLogin() {
           </h1>
           <p className="text-[15px] text-ink-2">Tanpa password. Kode login dikirim ke nomor WhatsApp yang terdaftar.</p>
         </div>
-        <FormLogin />
+        {otpDibypass() && (
+          <p className="rounded-xl bg-warn-soft px-3.5 py-2.5 text-sm text-warn">
+            <b>Mode development:</b> OTP dilewati (OTP_BYPASS=1). Cukup masukkan nomor yang terdaftar.
+          </p>
+        )}
+        <FormLogin bypass={otpDibypass()} />
       </div>
     </main>
   );

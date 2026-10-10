@@ -1,6 +1,10 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { eq } from "drizzle-orm";
+import { db } from "@/db";
+import { users } from "@/db/schema";
+import { otpDibypass } from "@/lib/auth/bypass";
 import { normalisasiNoWa } from "@/lib/wa";
 import { mintaOtp, verifikasiOtp } from "@/lib/auth/otp";
 import { buatSesi, cabutSemuaSesi, cabutSesiIni, wajibLogin } from "@/lib/auth/session";
@@ -18,6 +22,14 @@ export async function aksiLogin(prev: StateLogin, form: FormData): Promise<State
   if (aksi === "minta" || aksi === "kirim-ulang") {
     const noWa = normalisasiNoWa(String(form.get("noWa") ?? prev.noWa ?? ""));
     if (!noWa) return { langkah: "nomor", error: "Nomor WhatsApp tidak valid. Contoh: 0812 3456 7890" };
+
+    if (otpDibypass()) {
+      const [user] = await db.select().from(users).where(eq(users.noWa, noWa)).limit(1);
+      if (!user?.aktif) return { langkah: "nomor", error: "Nomor ini belum terdaftar atau tidak aktif." };
+      await buatSesi(user.id, true);
+      redirect("/");
+    }
+
     const hasil = await mintaOtp(noWa);
     if (!hasil.ok) return { langkah: aksi === "kirim-ulang" ? "kode" : "nomor", noWa, error: hasil.pesan };
     return { langkah: "kode", noWa, pesan: "Kode 6 digit sudah dikirim ke WhatsApp Anda." };

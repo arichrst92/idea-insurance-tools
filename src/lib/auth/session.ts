@@ -6,6 +6,7 @@ import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { sessions, users, type User } from "@/db/schema";
 import { hash, tokenSesi } from "./crypto";
+import { otpDibypass } from "./bypass";
 
 // Sesi persisten 30 hari, diperpanjang otomatis setiap dipakai (sliding).
 // Token mentah hanya ada di cookie; database menyimpan hash-nya, sehingga
@@ -82,6 +83,7 @@ export async function wajibLogin(role?: User["role"]): Promise<SesiAktif> {
 
 /** Tindakan sensitif (penarikan, transfer komisi, ubah rekening/bagi hasil) butuh OTP ulang bila > 12 jam. */
 export function perluVerifikasiUlang(s: SesiAktif): boolean {
+  if (otpDibypass()) return false;
   return Date.now() - s.sesi.verifikasiOtpTerakhir.getTime() > VERIFIKASI_ULANG_MS;
 }
 

@@ -8,7 +8,7 @@ import { kirimTanpaReset } from "@/components/form-aksi";
 
 const awal: StateLogin = { langkah: "nomor" };
 
-export function FormLogin() {
+export function FormLogin({ bypass = false }: { bypass?: boolean }) {
   const [state, aksi, pending] = useActionState(aksiLogin, awal);
 
   return (
@@ -27,7 +27,7 @@ export function FormLogin() {
             />
           </label>
           <Tombol name="aksi" value="minta" disabled={pending} className="h-12">
-            {pending ? "Mengirim…" : "Kirim kode"}
+            {pending ? "Memproses…" : bypass ? "Masuk" : "Kirim kode"}
           </Tombol>
         </>
       ) : (
