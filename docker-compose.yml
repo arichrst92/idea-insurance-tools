@@ -1,5 +1,5 @@
 # Development: `docker compose up -d db redis` lalu `npm run dev`.
-# Production (VPS): `docker compose --profile prod up -d --build`.
+# Profil prod hanya untuk server khusus; VPS bersama ide.asia memakai deploy native (docs/DEPLOY-VPS.md).
 
 services:
   db:

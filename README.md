@@ -41,13 +41,18 @@ Dengan `OTP_BYPASS=1` (bawaan `.env.example`) login cukup dengan nomor terdaftar
 
 ## Deploy ke VPS
 
+Produksi berjalan di VPS `72.60.74.202` yang **berbagi dengan IDEA Company Profile (ide.asia)** — native (tanpa Docker),
+systemd `insurance-app` di `127.0.0.1:3100`, Nginx site `insurance.ide.asia` (reload saja), certbot `--nginx`,
+PostgreSQL `insurance_prod`, backup harian 02:30 WIB. Langkah lengkap, aturan tenant & estimasi resource:
+**[docs/DEPLOY-VPS.md](docs/DEPLOY-VPS.md)**. File konfigurasi ada di `deploy/`.
+
 ```bash
-cp .env.example .env    # isi AUTH_SECRET, FONNTE_TOKEN, POSTGRES_PASSWORD, dst.
-docker compose --profile prod up -d --build
-docker compose --profile prod run --rm migrate npx tsx scripts/seed.ts   # sekali, untuk admin pertama
+git tag v1.0.0 && git push --tags        # GitHub Actions "Rilis" → insurance-v1.0.0.tar.gz
+# di VPS (user insurance-deploy):
+/var/www/insurance/bin/pasang-rilis.sh /tmp/insurance-v1.0.0.tar.gz   # backup → migrasi → restart → cek /api/sehat
 ```
 
-Aplikasi listen di `127.0.0.1:3000`; Nginx di host meneruskan `insurance.ide.asia` ke sana dengan SSL (Certbot). Set `client_max_body_size 50m;` di blok server Nginx agar upload beberapa file sekaligus tidak ditolak.
+`docker-compose.yml` hanya untuk development (Postgres + Redis lokal); profil `prod`-nya untuk server khusus, bukan VPS bersama.
 
 ## Kerahasiaan angka asuransi
 
@@ -64,7 +69,7 @@ merender halaman cetak `/cetak/<jenis>` (token sekali pakai) menjadi A4 → noti
 Bila Redis tidak jalan, PDF diproses langsung di proses app.
 
 - Development: `docker compose up -d db redis`, lalu sekali `npx playwright install chromium` (atau isi `PDF_CHROMIUM_PATH`).
-- Production: image Docker sudah memasang Chromium (`PDF_CHROMIUM_PATH=/usr/bin/chromium-browser`).
+- Production (VPS): Chromium Playwright di `/var/www/insurance/browsers/` (lihat docs/DEPLOY-VPS.md). Tanpa Redis, PDF diproses langsung.
 
 ## Otomasi & webhook WhatsApp
 

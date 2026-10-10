@@ -1,0 +1,11 @@
+# /etc/systemd/system/insurance-backup.timer — 02:30 WIB setiap hari (traffic ide.asia ~0)
+[Unit]
+Description=Jadwal backup harian Rekap Asuransi
+
+[Timer]
+OnCalendar=*-*-* 02:30:00 Asia/Jakarta
+Persistent=true
+RandomizedDelaySec=5min
+
+[Install]
+WantedBy=timers.target

@@ -1,4 +1,4 @@
-// Data awal: admin pertama, template WhatsApp, dan pengaturan otomasi.
+// Data awal: admin pertama, template WhatsApp, pengaturan otomasi, dan isi panduan sales.
 // Jalankan: ADMIN_NAMA="Ari Christian" ADMIN_NO_WA=0812xxxx npm run db:seed
 // Aman dijalankan berulang (tidak menimpa data yang sudah ada).
 
@@ -6,6 +6,7 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import * as schema from "../src/db/schema";
 import { normalisasiNoWa } from "../src/lib/wa";
+import { PANDUAN_BAWAAN } from "../src/lib/domain/panduan";
 
 const client = postgres(process.env.DATABASE_URL ?? "postgresql://insurance:insurance@localhost:5432/insurance", { max: 1 });
 const db = drizzle(client, { schema, casing: "snake_case" });
@@ -96,6 +97,9 @@ async function main() {
 
   for (const o of OTOMASI) await db.insert(schema.otomasiSetting).values(o).onConflictDoNothing();
   console.log(`✓ ${OTOMASI.length} pengaturan otomasi`);
+
+  await db.insert(schema.panduanBagian).values(PANDUAN_BAWAAN).onConflictDoNothing();
+  console.log(`✓ ${PANDUAN_BAWAAN.length} bagian panduan sales`);
 }
 
 main()

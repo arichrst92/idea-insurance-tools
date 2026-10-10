@@ -12,6 +12,8 @@ import { wajibLogin } from "@/lib/auth/session";
 import { Kartu, KepalaHalaman } from "@/components/ui";
 import { Angka } from "@/components/laporan";
 import { LencanaStatus } from "@/components/journey";
+import { ChecklistOnboarding } from "@/components/checklist-onboarding";
+import { onboardingSales } from "@/lib/panduan";
 import { angka, persen, rupiah } from "@/lib/format";
 
 // Status yang menunggu tindakan masing-masing peran (sama dengan tab "Giliran saya").
@@ -26,7 +28,7 @@ export default async function Dashboard() {
   const hariIni = waktuWib().tanggal;
   const p = periode("bulan_ini", hariIni);
 
-  const [rows, [nHabis], [nKlaim], giliran, cair, targets, [nNasabah]] = await Promise.all([
+  const [rows, [nHabis], [nKlaim], giliran, cair, targets, [nNasabah], onboarding] = await Promise.all([
     polisLunas(user, { dari: p.dari, sampai: p.sampai }),
     db
       .select({ n: count() })
@@ -60,6 +62,7 @@ export default async function Dashboard() {
     dataPencairan(user, hariIni),
     admin ? Promise.resolve(new Map()) : targetRentang(p.dari, p.sampai),
     db.select({ n: count() }).from(nasabah).where(admin ? undefined : eq(nasabah.salesId, user.id)),
+    admin ? null : onboardingSales(user.id),
   ]);
   const t = total(rows, admin);
   const tertunggak = admin ? Object.values(cair.tahap).reduce((a, d) => a + d.length, 0) : cair.tahap.komisi.length;
@@ -71,6 +74,7 @@ export default async function Dashboard() {
   return (
     <>
       <KepalaHalaman jejak={[{ label: "Dashboard" }]} judul={`Halo ${namaDepan},`} sorot="selamat bekerja" sub={`Ringkasan ${p.label}.`} />
+      {onboarding && !onboarding.ditutup && !onboarding.beres && <ChecklistOnboarding data={onboarding} ringkas />}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6" data-uji="dashboard">
         <Angka label="Premi bulan ini" nilai={rupiah(t?.premi ?? 0)} href="/laporan" />
         <Angka label="Polis lunas bulan ini" nilai={angka(t?.polis ?? 0)} sub={`${angka(nNasabah.n)} nasabah ${admin ? "terdaftar" : "Anda"}`} href="/polis" />

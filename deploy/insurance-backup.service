@@ -1,0 +1,12 @@
+# /etc/systemd/system/insurance-backup.service
+[Unit]
+Description=Backup harian Rekap Asuransi (Postgres + upload)
+
+[Service]
+Type=oneshot
+User=insurance-deploy
+ExecStart=/var/www/insurance/bin/backup.sh harian
+Nice=10
+IOSchedulingClass=idle
+StandardOutput=append:/var/log/insurance/backup.log
+StandardError=append:/var/log/insurance/backup.log

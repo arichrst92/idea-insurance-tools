@@ -1,0 +1,9 @@
+# /etc/logrotate.d/insurance
+/var/log/insurance/*.log {
+  weekly
+  rotate 8
+  compress
+  missingok
+  notifempty
+  copytruncate
+}

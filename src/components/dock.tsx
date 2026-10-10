@@ -30,8 +30,6 @@ import {
 
 type Item = { href: string; label: string; ikon: LucideIcon; admin?: boolean; badge?: number };
 
-// Menu yang belum dibangun tetap tampil agar dock konsisten dengan mockup;
-// halamannya menampilkan "segera hadir" sampai sprint terkait selesai.
 const ITEMS: Item[] = [
   { href: "/", label: "Dashboard", ikon: LayoutGrid },
   { href: "/pengajuan", label: "Pengajuan", ikon: Send },

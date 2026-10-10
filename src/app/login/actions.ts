@@ -9,6 +9,12 @@ import { normalisasiNoWa } from "@/lib/wa";
 import { mintaOtp, verifikasiOtp } from "@/lib/auth/otp";
 import { buatSesi, cabutSemuaSesi, cabutSesiIni, wajibLogin } from "@/lib/auth/session";
 
+/** Sales yang belum pernah membuka panduan diarahkan ke checklist 5 langkah awal. */
+async function tujuanSetelahLogin(userId: string): Promise<string> {
+  const [u] = await db.select({ role: users.role, dibuka: users.panduanDibuka }).from(users).where(eq(users.id, userId));
+  return u?.role === "sales" && !u.dibuka ? "/panduan" : "/";
+}
+
 export type StateLogin = {
   langkah: "nomor" | "kode";
   noWa?: string;
@@ -27,7 +33,7 @@ export async function aksiLogin(prev: StateLogin, form: FormData): Promise<State
       const [user] = await db.select().from(users).where(eq(users.noWa, noWa)).limit(1);
       if (!user?.aktif) return { langkah: "nomor", error: "Nomor ini belum terdaftar atau tidak aktif." };
       await buatSesi(user.id, true);
-      redirect("/");
+      redirect(await tujuanSetelahLogin(user.id));
     }
 
     const hasil = await mintaOtp(noWa);
@@ -43,7 +49,7 @@ export async function aksiLogin(prev: StateLogin, form: FormData): Promise<State
     const hasil = await verifikasiOtp(noWa, kode);
     if (!hasil.ok) return { langkah: "kode", noWa, error: hasil.pesan };
     await buatSesi(hasil.userId, form.get("ingat") === "on");
-    redirect("/");
+    redirect(await tujuanSetelahLogin(hasil.userId));
   }
 
   if (aksi === "ganti-nomor") return { langkah: "nomor" };

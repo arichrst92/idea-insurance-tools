@@ -130,6 +130,12 @@ export const users = pgTable("users", {
   aktif: boolean().notNull().default(true),
   tglNonaktif: tanggal(),
   alasanNonaktif: text(),
+  /** Panduan sales: pertama kali dibuka (null = belum pernah → diarahkan ke /panduan setelah login). */
+  panduanDibuka: waktu(),
+  /** Langkah onboarding yang dicentang sendiri oleh sales (kode langkah). */
+  onboardingCentang: text().array().notNull().default(sql`'{}'::text[]`),
+  /** Checklist onboarding disembunyikan dari dashboard. */
+  onboardingDitutup: waktu(),
   dibuat: dibuat(),
   diubah: dibuat().$onUpdate(() => new Date()),
 });
@@ -708,6 +714,18 @@ export const pengalihanSales = pgTable("pengalihan_sales", {
   komisiIkut: boolean().notNull().default(false),
   waktu: dibuat(),
   oleh: text().references(() => users.id),
+});
+
+/** Isi Panduan sales yang bisa diubah admin (teks ringan: "## sub judul", "- poin", "1. langkah", "**tebal**", "?? tanya" untuk FAQ). */
+export const panduanBagian = pgTable("panduan_bagian", {
+  id: id(),
+  kode: text().notNull().unique(),
+  judul: text().notNull(),
+  isi: text().notNull(),
+  urutan: integer().notNull().default(0),
+  aktif: boolean().notNull().default(true),
+  diubah: dibuat().$onUpdate(() => new Date()),
+  diubahOleh: text().references(() => users.id),
 });
 
 export const auditLog = pgTable(

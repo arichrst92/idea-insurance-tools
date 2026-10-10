@@ -43,3 +43,5 @@ next-env.d.ts
 
 # file upload lokal (development)
 /storage
+/rilis
+dump.rdb

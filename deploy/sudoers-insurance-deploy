@@ -1,0 +1,3 @@
+# /etc/sudoers.d/insurance-deploy  (cek: sudo visudo -cf <file>, lalu salin & chmod 440)
+# insurance-deploy hanya boleh mengelola service miliknya — tidak bisa menyentuh nginx/pm2/mongodb.
+insurance-deploy ALL=(root) NOPASSWD: /usr/bin/systemctl restart insurance-app, /usr/bin/systemctl start insurance-app, /usr/bin/systemctl stop insurance-app, /usr/bin/systemctl status insurance-app, /usr/bin/systemctl start insurance-backup.service

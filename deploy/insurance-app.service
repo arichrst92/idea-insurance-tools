@@ -1,0 +1,30 @@
+# /etc/systemd/system/insurance-app.service — Rekap Asuransi (insurance.ide.asia)
+# SATU proses saja (bukan cluster): penjadwal otomasi berjalan di dalam proses ini.
+[Unit]
+Description=Rekap Asuransi (Next.js) - insurance.ide.asia
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=insurance-deploy
+Group=insurance-deploy
+WorkingDirectory=/var/www/insurance/current
+EnvironmentFile=/var/www/insurance/shared/.env
+Environment=NODE_ENV=production PORT=3100 HOSTNAME=127.0.0.1 NODE_OPTIONS=--max-old-space-size=512
+ExecStart=/usr/bin/node server.js
+Restart=on-failure
+RestartSec=5s
+# Lindungi ide.asia: batasi RAM & CPU proses ini (termasuk Chromium untuk ekspor PDF).
+MemoryHigh=900M
+MemoryMax=1200M
+CPUQuota=80%
+StandardOutput=append:/var/log/insurance/out.log
+StandardError=append:/var/log/insurance/err.log
+# Hardening ringan: hanya boleh menulis ke folder sendiri.
+NoNewPrivileges=true
+ProtectSystem=full
+ReadWritePaths=/var/www/insurance /var/www/insurance-uploads /var/log/insurance /var/backups/insurance
+
+[Install]
+WantedBy=multi-user.target

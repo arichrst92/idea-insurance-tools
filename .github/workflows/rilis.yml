@@ -1,0 +1,28 @@
+name: Rilis
+
+# Paket untuk VPS: push tag `v*` (mis. git tag v1.0.0 && git push --tags) atau jalankan manual.
+# Hasil: artifact `insurance-<versi>.tar.gz` (unduh dari halaman run) → scp ke VPS → deploy/pasang-rilis.sh
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+jobs:
+  paket:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20 # sama dengan Node di VPS
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: ./scripts/rilis.sh "${GITHUB_REF_NAME//\//-}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: insurance-${{ github.ref_name }}
+          path: rilis/*.tar.gz
+          retention-days: 30
