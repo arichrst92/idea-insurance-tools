@@ -4,6 +4,8 @@ const nextConfig: NextConfig = {
   // Image Docker kecil: hanya server mandiri + file yang dipakai.
   output: "standalone",
   poweredByHeader: false,
+  // Upload KTP/STNK/foto/PDF lewat server action (maks 10 MB per file).
+  experimental: { serverActions: { bodySizeLimit: "12mb" } },
   async headers() {
     return [
       {

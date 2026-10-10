@@ -15,6 +15,17 @@ export const LANGKAH: { status: StatusPengajuan; label: string; oleh: string }[]
   { status: "selesai", label: "Selesai", oleh: "Admin" },
 ];
 
+/** Pengajuan yang polisnya belum terbit: ikut pindah saat nasabah dialihkan ke sales lain. */
+export const STATUS_SEBELUM_TERBIT: StatusPengajuan[] = [
+  "draft_prospek",
+  "data_lengkap",
+  "dikirim_ke_asuransi",
+  "survei_kendaraan",
+  "penawaran_masuk",
+  "disetujui_nasabah",
+  "perlu_revisi",
+];
+
 export const LABEL_CABANG: Partial<Record<StatusPengajuan, string>> = {
   perlu_revisi: "Perlu revisi",
   ditolak_asuransi: "Ditolak asuransi",

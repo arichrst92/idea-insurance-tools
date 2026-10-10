@@ -68,7 +68,7 @@ src/
 ## Status sprint
 
 - [x] **Sprint 1 — Fondasi & login**: repo, skema database lengkap, Docker, CI, login OTP + sesi persisten, role admin/sales, dock & breadcrumb, master asuransi (+ kontak email & WA PIC), kategori polis, bengkel, rekening kantor, form sales (fulltime/freelance, target bulanan, gaji pokok, bagi hasil, maks cashback, rekening)
-- [ ] Sprint 2 — Nasabah & kendaraan
+- [x] **Sprint 2 — Nasabah & kendaraan**: daftar + cari (nama, no. WA, plat) + filter, tambah/ubah nasabah & kendaraan, data dibatasi per sales, upload KTP/STNK/foto (privat, lewat /api/dokumen), rekening cashback nasabah, tandai kendaraan dijual/tidak dipakai, pindah kepemilikan, nonaktifkan/aktifkan sales + pengalihan nasabah
 - [ ] Sprint 3 — Polis & cashback (termasuk link tracker nasabah)
 - [ ] Sprint 4 — Perpanjangan & klaim
 - [ ] Sprint 5 — Laporan & pencairan

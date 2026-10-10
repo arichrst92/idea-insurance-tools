@@ -3,6 +3,7 @@ import { hitungKomisi, bagiHasilBerlaku, KomisiError, type EventAktif } from "./
 import { hitungGaji, pencapaianPersen } from "./gaji";
 import { langkahNasabah, nomorLangkah, samarkanPlat, transisiSah } from "./journey";
 import { normalisasiNoWa } from "../wa";
+import { normalisasiPlat } from "./kendaraan";
 
 describe("hitungKomisi — contoh di dokumen", () => {
   const dasar = {
@@ -126,4 +127,14 @@ describe("normalisasiNoWa", () => {
   it("menolak nomor tidak valid", () => {
     expect(normalisasiNoWa("12345")).toBeNull();
   });
+});
+
+describe("normalisasiPlat", () => {
+  it.each([
+    ["d1234abc", "D 1234 ABC"],
+    ["B  12 XY", "B 12 XY"],
+    ["AB-1-C", "AB 1 C"],
+    ["L 1", "L 1"],
+  ])("%s → %s", (a, b) => expect(normalisasiPlat(a)).toBe(b));
+  it.each(["1234", "ABC 1234 D", "D 12345 A", ""])("menolak %s", (a) => expect(normalisasiPlat(a)).toBeNull());
 });
