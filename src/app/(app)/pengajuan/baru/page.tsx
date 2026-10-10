@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { and, asc, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { kategoriPolis, kendaraan, nasabah, perusahaanAsuransi } from "@/db/schema";
+import { kategoriPolis, kendaraan, nasabah } from "@/db/schema";
 import { wajibLogin } from "@/lib/auth/session";
 import { filterNasabah } from "@/lib/akses";
 import { FormAksi } from "@/components/form-aksi";
@@ -69,14 +69,8 @@ export default async function PengajuanBaru({ searchParams }: { searchParams: Pr
       .from(kendaraan)
       .where(and(eq(kendaraan.nasabahId, terpilih.id), eq(kendaraan.status, "aktif")))
       .orderBy(asc(kendaraan.dibuat)),
-    db
-      .select({ k: kategoriPolis, asuransi: perusahaanAsuransi.nama })
-      .from(kategoriPolis)
-      .innerJoin(perusahaanAsuransi, eq(perusahaanAsuransi.id, kategoriPolis.perusahaanId))
-      .where(eq(kategoriPolis.aktif, true))
-      .orderBy(asc(perusahaanAsuransi.nama)),
+    db.select().from(kategoriPolis).where(eq(kategoriPolis.aktif, true)).orderBy(asc(kategoriPolis.urutan)),
   ]);
-  const perluasan = [...new Set(kategori.flatMap((k) => k.k.perluasanTersedia))];
 
   return (
     <>
@@ -116,26 +110,27 @@ export default async function PengajuanBaru({ searchParams }: { searchParams: Pr
             </fieldset>
             <div className="grid gap-4 sm:grid-cols-2">
               <Isian label="Nilai pertanggungan (Rp)" name="nilaiPertanggungan" inputMode="numeric" placeholder="185.000.000" required />
-              <Pilihan label="Produk diminta (opsional)" name="kategoriId" defaultValue="">
-                <option value="">Belum ditentukan</option>
-                {kategori.map(({ k, asuransi }) => (
-                  <option key={k.id} value={k.id}>
-                    {asuransi} — {k.namaProduk} ({k.jenis})
-                  </option>
-                ))}
-              </Pilihan>
             </div>
-            {perluasan.length > 0 && (
-              <fieldset>
-                <legend className="mb-2 text-[13px] font-semibold text-ink-2">Perluasan diminta</legend>
-                <div className="flex flex-wrap gap-2">
-                  {perluasan.map((p) => (
-                    <label key={p} className="flex cursor-pointer items-center gap-2 rounded-full border border-line px-3.5 py-1.5 text-sm has-[:checked]:border-brand has-[:checked]:bg-brand-soft has-[:checked]:text-brand-ink">
-                      <input type="checkbox" name="perluasanDiminta" value={p} className="accent-brand" />
-                      {p}
+            {kategori.length > 0 && (
+              <fieldset className="flex flex-col gap-2">
+                <legend className="mb-2 text-[13px] font-semibold text-ink-2">Paket yang diminati (opsional)</legend>
+                <div className="grid gap-2 sm:grid-cols-4">
+                  <label className="flex cursor-pointer items-center gap-2 rounded-2xl border border-line p-3 text-sm has-[:checked]:border-ink has-[:checked]:ring-1 has-[:checked]:ring-ink">
+                    <input type="radio" name="kategoriId" value="" defaultChecked className="accent-ink" />
+                    Semua paket
+                  </label>
+                  {kategori.map((k) => (
+                    <label
+                      key={k.id}
+                      title={k.cakupan.join("\n")}
+                      className="flex cursor-pointer items-center gap-2 rounded-2xl border border-line p-3 text-sm has-[:checked]:border-ink has-[:checked]:ring-1 has-[:checked]:ring-ink"
+                    >
+                      <input type="radio" name="kategoriId" value={k.id} className="accent-ink" />
+                      <b>{k.nama}</b>
                     </label>
                   ))}
                 </div>
+                <span className="text-xs text-ink-3">Asuransi akan diminta penawaran untuk paket ini; pilih &ldquo;Semua paket&rdquo; bila nasabah belum memutuskan.</span>
               </fieldset>
             )}
             <p className="text-[13px] text-ink-3">

@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { and, asc, eq, isNull, sql } from "drizzle-orm";
 import clsx from "clsx";
 import { db } from "@/db";
-import { dokumen, kendaraan, nasabah, perusahaanAsuransi, polis, rekening, statusHistory, trackerLink, users } from "@/db/schema";
+import { dokumen, kategoriPolis, kendaraan, nasabah, perusahaanAsuransi, polis, rekening, statusHistory, trackerLink, users } from "@/db/schema";
 import { LANGKAH_NASABAH, langkahNasabah, samarkanPlat } from "@/lib/domain/journey";
 import { rupiah } from "@/lib/format";
 import { linkWaMe } from "@/lib/wa";
@@ -23,7 +23,7 @@ const tgl = (d: Date | string | null | undefined) =>
 export default async function Tracker({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
   const [b] = await db
-    .select({ t: trackerLink, p: polis, n: nasabah, k: kendaraan, a: perusahaanAsuransi, s: users, r: rekening })
+    .select({ t: trackerLink, p: polis, n: nasabah, k: kendaraan, a: perusahaanAsuransi, s: users, r: rekening, kat: kategoriPolis })
     .from(trackerLink)
     .innerJoin(polis, eq(polis.id, trackerLink.polisId))
     .innerJoin(nasabah, eq(nasabah.id, polis.nasabahId))
@@ -31,6 +31,7 @@ export default async function Tracker({ params }: { params: Promise<{ token: str
     .innerJoin(users, eq(users.id, polis.salesId))
     .leftJoin(perusahaanAsuransi, eq(perusahaanAsuransi.id, polis.perusahaanId))
     .leftJoin(rekening, eq(rekening.id, polis.rekeningPembayaranId))
+    .leftJoin(kategoriPolis, eq(kategoriPolis.id, polis.kategoriId))
     .where(and(eq(trackerLink.token, token.toUpperCase()), isNull(trackerLink.dicabut)));
   if (!b) notFound();
 
@@ -70,7 +71,7 @@ export default async function Tracker({ params }: { params: Promise<{ token: str
   const catatan = [
     "Data dan dokumen kendaraan diterima",
     b.a ? `Diajukan ke ${b.a.nama}` : "Diajukan ke perusahaan asuransi",
-    b.p.premiBruto ? `Premi ${rupiah(b.p.premiBruto)}` : "Menunggu penawaran terbaik",
+    b.p.premiBruto ? `${b.kat ? `Paket ${b.kat.nama} · ` : ""}Premi ${rupiah(b.p.premiBruto)}` : "Menunggu penawaran terbaik",
     b.p.noPolis ? `No. polis ${b.p.noPolis}` : "Diterbitkan oleh asuransi",
     b.p.statusBayar === "lunas" ? `Lunas ${tgl(b.p.tglBayar)}` : b.p.batasBayar ? `Batas ${tgl(b.p.batasBayar)}` : "Transfer premi",
     b.p.cashbackNasabahRp ? `${rupiah(b.p.cashbackNasabahRp)} ke rekening Anda` : "Cashback ke rekening Anda",
@@ -151,7 +152,7 @@ export default async function Tracker({ params }: { params: Promise<{ token: str
           <h1 className="text-[30px] font-extrabold leading-[1.08] tracking-tight">{judul}</h1>
           <p className="text-sm text-ink-2">
             {b.k.merek} {b.k.model} {b.k.tahun} · {samarkanPlat(b.k.noPolisi)}
-            {b.a && ` · ${b.a.nama}`}
+            {b.a && ` · ${b.a.nama}${b.kat && b.p.premiBruto ? ` ${b.kat.nama}` : ""}`}
           </p>
         </div>
       </header>

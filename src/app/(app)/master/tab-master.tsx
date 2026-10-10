@@ -6,7 +6,7 @@ import clsx from "clsx";
 
 const TAB = [
   { href: "/master/asuransi", label: "Asuransi" },
-  { href: "/master/kategori", label: "Kategori polis" },
+  { href: "/master/kategori", label: "Paket coverage" },
   { href: "/master/bengkel", label: "Bengkel" },
   { href: "/master/rekening", label: "Rekening kantor" },
 ];

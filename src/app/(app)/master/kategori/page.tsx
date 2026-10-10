@@ -1,99 +1,76 @@
-import { asc, eq } from "drizzle-orm";
+import { asc } from "drizzle-orm";
 import { db } from "@/db";
-import { kategoriPolis, perusahaanAsuransi } from "@/db/schema";
+import { kategoriPolis } from "@/db/schema";
 import { FormAksi } from "@/components/form-aksi";
-import { Isian, Kartu, KepalaHalaman, Kosong, Lencana, Pilihan } from "@/components/ui";
-import { persen } from "@/lib/format";
+import { Isian, IsianPanjang, Kartu, KepalaHalaman, Kosong, Lencana } from "@/components/ui";
 import { TabMaster } from "../tab-master";
-import { tambahKategori, ubahAktifKategori } from "../actions";
+import { simpanPaket, ubahAktifKategori } from "../actions";
 
-export const metadata = { title: "Kategori polis" };
+export const metadata = { title: "Paket coverage" };
 
-export default async function HalamanKategori() {
-  const [daftar, asuransi] = await Promise.all([
-    db
-      .select({ k: kategoriPolis, asuransi: perusahaanAsuransi.nama })
-      .from(kategoriPolis)
-      .innerJoin(perusahaanAsuransi, eq(perusahaanAsuransi.id, kategoriPolis.perusahaanId))
-      .orderBy(asc(perusahaanAsuransi.nama), asc(kategoriPolis.namaProduk)),
-    db.select().from(perusahaanAsuransi).where(eq(perusahaanAsuransi.aktif, true)).orderBy(asc(perusahaanAsuransi.nama)),
-  ]);
+export default async function HalamanPaket() {
+  const daftar = await db.select().from(kategoriPolis).orderBy(asc(kategoriPolis.urutan), asc(kategoriPolis.nama));
 
   return (
     <>
       <KepalaHalaman
-        jejak={[{ label: "Master data", href: "/master" }, { label: "Kategori polis" }]}
-        judul="Kategori"
-        sorot="polis"
-        sub="Produk asuransi per perusahaan: jenis, rate dasar, dan perluasan yang tersedia."
+        jejak={[{ label: "Master data", href: "/master" }, { label: "Paket coverage" }]}
+        judul="Paket"
+        sorot="coverage"
+        sub="Paket yang ditawarkan ke nasabah, berlaku untuk semua asuransi. Premi tiap paket dicatat dari penawaran asuransi, tidak dihitung sistem."
       />
       <TabMaster />
       <div className="grid items-start gap-4 lg:grid-cols-[1.6fr_1fr]">
-        <Kartu className="overflow-x-auto p-0">
-          {daftar.length === 0 ? (
-            <div className="p-5">
-              <Kosong>Belum ada kategori polis.</Kosong>
-            </div>
-          ) : (
-            <table className="w-full text-sm">
-              <thead className="text-left text-[12px] uppercase tracking-wider text-ink-3">
-                <tr className="border-b border-line">
-                  <th className="px-5 py-3 font-semibold">Produk</th>
-                  <th className="px-3 py-3 font-semibold">Jenis</th>
-                  <th className="px-3 py-3 text-right font-semibold">Rate</th>
-                  <th className="px-3 py-3 font-semibold">Perluasan</th>
-                  <th className="px-5 py-3" />
-                </tr>
-              </thead>
-              <tbody>
-                {daftar.map(({ k, asuransi }) => (
-                  <tr key={k.id} className="border-b border-line last:border-0">
-                    <td className="px-5 py-3">
-                      <div className="font-semibold">{k.namaProduk}</div>
-                      <div className="text-xs text-ink-3">{asuransi}</div>
-                    </td>
-                    <td className="px-3 py-3">
-                      <Lencana nada={k.jenis === "TLO" ? "netral" : "brand"}>{k.jenis}</Lencana>
-                    </td>
-                    <td className="px-3 py-3 text-right tabular-nums">{persen(k.rateDasarPersen)}</td>
-                    <td className="px-3 py-3 text-ink-2">{k.perluasanTersedia.join(", ") || "–"}</td>
-                    <td className="px-5 py-3 text-right">
-                      <form action={ubahAktifKategori.bind(null, k.id, !k.aktif)}>
-                        <button className="text-[12px] font-semibold text-brand">{k.aktif ? "Nonaktifkan" : "Aktifkan"}</button>
-                      </form>
-                    </td>
-                  </tr>
+        <div className="flex flex-col gap-3">
+          {daftar.length === 0 && <Kosong>Belum ada paket. Tambahkan Biasa, Plus, Complete.</Kosong>}
+          {daftar.map((k) => (
+            <Kartu key={k.id} className="flex flex-col gap-3">
+              <div className="flex items-start justify-between gap-2">
+                <h2 className="text-lg font-extrabold">{k.nama}</h2>
+                {!k.aktif && <Lencana>NONAKTIF</Lencana>}
+              </div>
+              <ul className="flex flex-col gap-1 text-sm text-ink-2">
+                {k.cakupan.map((c) => (
+                  <li key={c} className="flex gap-2">
+                    <span aria-hidden className="mt-2 size-1.5 shrink-0 rounded-full bg-brand" />
+                    {c}
+                  </li>
                 ))}
-              </tbody>
-            </table>
-          )}
-        </Kartu>
+              </ul>
+              <div className="flex gap-4 border-t border-line pt-3">
+                <details className="flex-1">
+                  <summary className="cursor-pointer text-[13px] font-semibold text-brand">Ubah</summary>
+                  <div className="pt-3">
+                    <FormAksi aksi={simpanPaket.bind(null, k.id)} tombol="Simpan paket" varian="kedua">
+                      <div className="grid grid-cols-[1fr_96px] gap-3">
+                        <Isian label="Nama paket" name="nama" defaultValue={k.nama} required />
+                        <Isian label="Urutan" name="urutan" type="number" min={0} defaultValue={k.urutan} />
+                      </div>
+                      <IsianPanjang label="Risiko yang dijamin" name="cakupan" defaultValue={k.cakupan.join("\n")} hint="Satu baris per item." rows={6} />
+                    </FormAksi>
+                  </div>
+                </details>
+                <form action={ubahAktifKategori.bind(null, k.id, !k.aktif)}>
+                  <button className="text-[13px] font-semibold text-ink-3 hover:text-ink">{k.aktif ? "Nonaktifkan" : "Aktifkan"}</button>
+                </form>
+              </div>
+            </Kartu>
+          ))}
+        </div>
         <Kartu className="flex flex-col gap-4">
-          <h2 className="text-base font-bold">Tambah kategori</h2>
-          <FormAksi aksi={tambahKategori} tombol="Tambah kategori" resetSetelahOk>
-            <Pilihan label="Asuransi" name="perusahaanId" required defaultValue="">
-              <option value="" disabled>
-                Pilih asuransi…
-              </option>
-              {asuransi.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.nama}
-                </option>
-              ))}
-            </Pilihan>
-            <Isian label="Nama produk" name="namaProduk" placeholder="Comprehensive" required />
-            <div className="grid grid-cols-2 gap-3">
-              <Pilihan label="Jenis" name="jenis" defaultValue="All Risk">
-                <option>All Risk</option>
-                <option>TLO</option>
-              </Pilihan>
-              <Isian label="Rate dasar (%)" name="rateDasarPersen" inputMode="decimal" placeholder="2,5" />
+          <h2 className="text-base font-bold">Tambah paket</h2>
+          <FormAksi aksi={simpanPaket.bind(null, null)} tombol="Tambah paket" resetSetelahOk>
+            <div className="grid grid-cols-[1fr_96px] gap-3">
+              <Isian label="Nama paket" name="nama" placeholder="Plus" required />
+              <Isian label="Urutan" name="urutan" type="number" min={0} defaultValue={daftar.length + 1} />
             </div>
-            <Isian
-              label="Perluasan tersedia"
-              name="perluasan"
-              placeholder="Banjir, Huru-hara, Gempa"
-              hint="Pisahkan dengan koma."
+            <IsianPanjang
+              label="Risiko yang dijamin"
+              name="cakupan"
+              rows={6}
+              placeholder={"Tabrakan, benturan, terperosok, tergelincir\nBanjir, badai, angin topan\nTuntutan pihak ke-3"}
+              hint="Satu baris per item."
+              required
             />
           </FormAksi>
         </Kartu>

@@ -61,6 +61,24 @@ export function Isian({
   );
 }
 
+export function IsianPanjang({
+  label,
+  hint,
+  className,
+  ...p
+}: ComponentProps<"textarea"> & { label: string; hint?: string }) {
+  return (
+    <label className={clsx("flex flex-col gap-1.5 text-[13px] font-semibold text-ink-2", className)}>
+      {label}
+      <textarea
+        {...p}
+        className="min-h-28 w-full rounded-xl border border-line-2 bg-white px-3.5 py-2.5 text-[15px] font-normal leading-relaxed text-ink outline-none placeholder:text-ink-4 focus:border-brand focus:ring-4 focus:ring-brand-soft"
+      />
+      {hint && <span className="text-xs font-normal text-ink-3">{hint}</span>}
+    </label>
+  );
+}
+
 export function Pilihan({
   label,
   children,

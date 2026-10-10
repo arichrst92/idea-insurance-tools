@@ -97,7 +97,6 @@ export async function buatPengajuan(_: StateForm, f: FormData): Promise<StateFor
   const nilai = teks(f, "nilaiPertanggungan") ? parseRupiah(teks(f, "nilaiPertanggungan")) : null;
   if (nilai !== null && (Number.isNaN(nilai) || nilai <= 0)) return { error: "Nilai pertanggungan tidak valid" };
   const kategoriId = opsional(f, "kategoriId");
-  const perluasan = f.getAll("perluasanDiminta").map(String).filter(Boolean);
 
   const id = await db.transaction(async (tx) => {
     const kode = await kodeBaru(tx);
@@ -110,7 +109,6 @@ export async function buatPengajuan(_: StateForm, f: FormData): Promise<StateFor
         salesId: n.salesId,
         kategoriId,
         nilaiPertanggungan: nilai,
-        perluasanDiminta: perluasan,
         polisSebelumnyaId: opsional(f, "polisSebelumnyaId"),
       })
       .returning({ id: polis.id });
@@ -131,7 +129,7 @@ export async function ubahDataPengajuan(id: string, _: StateForm, f: FormData): 
   if (nilai !== null && (Number.isNaN(nilai) || nilai <= 0)) return { error: "Nilai pertanggungan tidak valid" };
   await db
     .update(polis)
-    .set({ nilaiPertanggungan: nilai, kategoriId: opsional(f, "kategoriId"), perluasanDiminta: f.getAll("perluasanDiminta").map(String) })
+    .set({ nilaiPertanggungan: nilai, kategoriId: opsional(f, "kategoriId") })
     .where(eq(polis.id, id));
   segarkan(id);
   return { ok: "Tersimpan" };
@@ -193,8 +191,7 @@ export async function kirimKeAsuransi(id: string, _: StateForm, f: FormData): Pr
     ["No. rangka", b.k.noRangka ?? "-"],
     ["No. mesin", b.k.noMesin ?? "-"],
     ["Nilai pertanggungan", rupiah(p.nilaiPertanggungan)],
-    ["Produk diminta", b.kat ? `${b.kat.namaProduk} (${b.kat.jenis})` : "-"],
-    ["Perluasan diminta", p.perluasanDiminta.join(", ") || "-"],
+    ["Paket diminta", b.kat ? b.kat.nama : "Mohon penawaran untuk semua paket (mis. Biasa, Plus, Complete)"],
   ];
   const teksData = baris.map(([k, v]) => `${k}: ${v}`).join("\n");
   const htmlData = `<table cellpadding="6" style="border-collapse:collapse;font-family:Arial,sans-serif;font-size:14px">${baris
@@ -309,29 +306,37 @@ export async function tambahPenawaran(id: string, _: StateForm, f: FormData): Pr
   const d = z
     .object({
       perusahaanId: z.string().min(1, "Pilih asuransi"),
-      premi: z.number({ invalid_type_error: "Isi premi" }).positive("Premi harus lebih dari 0"),
-      ratePersen: z.number().min(0).max(100).nullable(),
       cashbackTotalPersen: z.number({ invalid_type_error: "Isi cashback total %" }).min(0).max(100, "Cashback maks 100%"),
       catatan: z.string().nullable(),
     })
     .safeParse({
       perusahaanId: teks(f, "perusahaanId"),
-      premi: teks(f, "premi") ? parseRupiah(teks(f, "premi")) : undefined,
-      ratePersen: teks(f, "ratePersen") ? parsePersen(teks(f, "ratePersen")) : null,
       cashbackTotalPersen: teks(f, "cashbackTotalPersen") ? parsePersen(teks(f, "cashbackTotalPersen")) : undefined,
       catatan: opsional(f, "catatan"),
     });
   if (!d.success) return { error: d.error.issues[0]?.message };
 
+  // Premi per paket (Biasa/Plus/Complete) sesuai angka dari asuransi; boleh sebagian.
+  const paket = await db.select({ id: kategoriPolis.id, nama: kategoriPolis.nama }).from(kategoriPolis);
+  const baris: { kategoriId: string; premi: number }[] = [];
+  for (const k of paket) {
+    const v = teks(f, `premi_${k.id}`);
+    if (!v) continue;
+    const premi = parseRupiah(v);
+    if (Number.isNaN(premi) || premi <= 0) return { error: `Premi paket ${k.nama} tidak valid` };
+    baris.push({ kategoriId: k.id, premi });
+  }
+  if (baris.length === 0) return { error: "Isi premi minimal satu paket" };
+
   return jalankan(async () => {
     const dokumenId = await simpanDokumenPolis(f, "file", id, "penawaran", user.id);
-    await db.insert(penawaran).values({ ...d.data, polisId: id, dokumenId });
+    await db.insert(penawaran).values(baris.map((r) => ({ ...d.data, ...r, polisId: id, dokumenId })));
     if (p.statusPengajuan !== "penawaran_masuk") {
       await db.transaction((tx) => ubahStatus(tx, { polisId: id, ke: "penawaran_masuk", oleh: user.id }));
       await setelahStatus(id, user.id);
     }
     segarkan(id);
-    return { ok: "Penawaran dicatat" };
+    return { ok: `${baris.length} pilihan paket dicatat` };
   });
 }
 
@@ -366,13 +371,17 @@ export async function setujuiPenawaran(id: string, _: StateForm, f: FormData): P
       await tx.update(penawaran).set({ dipilih: false }).where(eq(penawaran.polisId, id));
       await tx.update(penawaran).set({ dipilih: true }).where(eq(penawaran.id, pw.id));
       const [a] = await tx.select({ nama: perusahaanAsuransi.nama }).from(perusahaanAsuransi).where(eq(perusahaanAsuransi.id, pw.perusahaanId));
+      const [kat] = pw.kategoriId
+        ? await tx.select({ nama: kategoriPolis.nama }).from(kategoriPolis).where(eq(kategoriPolis.id, pw.kategoriId))
+        : [];
       await ubahStatus(tx, {
         polisId: id,
         ke: "disetujui_nasabah",
         oleh: user.id,
-        catatan: `${a?.nama} ${rupiah(pw.premi)}, cashback nasabah ${cbNasabah}%`,
+        catatan: `${a?.nama}${kat ? ` ${kat.nama}` : ""} ${rupiah(pw.premi)}, cashback nasabah ${cbNasabah}%`,
         patch: {
           perusahaanId: pw.perusahaanId,
+          kategoriId: pw.kategoriId ?? p.kategoriId,
           premiBruto: pw.premi,
           cashbackTotalPersen: pw.cashbackTotalPersen,
           cashbackTotalRp: k.cashbackTotalRp,

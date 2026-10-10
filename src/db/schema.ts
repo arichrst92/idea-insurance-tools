@@ -223,16 +223,16 @@ export const kontakAsuransi = pgTable("kontak_asuransi", {
   utama: boolean().notNull().default(false),
 });
 
+/**
+ * Paket coverage (mis. Biasa, Plus, Complete) — berlaku untuk semua asuransi.
+ * Premi tiap paket tidak dihitung sistem; dicatat dari penawaran asuransi.
+ */
 export const kategoriPolis = pgTable("kategori_polis", {
   id: id(),
-  perusahaanId: text()
-    .notNull()
-    .references(() => perusahaanAsuransi.id),
-  namaProduk: text().notNull(),
-  /** "All Risk" | "TLO" */
-  jenis: text().notNull(),
-  rateDasarPersen: numeric({ precision: 6, scale: 3, mode: "number" }),
-  perluasanTersedia: text().array().notNull().default(sql`'{}'`),
+  nama: text().notNull(),
+  /** Daftar risiko yang dijamin, satu baris per item */
+  cakupan: text().array().notNull().default(sql`'{}'`),
+  urutan: integer().notNull().default(0),
   aktif: boolean().notNull().default(true),
 });
 
@@ -355,8 +355,6 @@ export const polis = pgTable(
     tglAkhir: tanggal(),
 
     nilaiPertanggungan: rupiah(),
-    perluasanDiminta: text().array().notNull().default(sql`'{}'`),
-    perluasan: text().array().notNull().default(sql`'{}'`),
     premiBruto: rupiah(),
 
     cashbackTotalPersen: persen(),
@@ -425,8 +423,9 @@ export const penawaran = pgTable("penawaran", {
   perusahaanId: text()
     .notNull()
     .references(() => perusahaanAsuransi.id),
+  /** Paket coverage yang ditawarkan (Biasa/Plus/Complete) */
+  kategoriId: text().references(() => kategoriPolis.id),
   premi: rupiah().notNull(),
-  ratePersen: numeric({ precision: 6, scale: 3, mode: "number" }),
   cashbackTotalPersen: persen().notNull(),
   catatan: text(),
   dokumenId: text(),

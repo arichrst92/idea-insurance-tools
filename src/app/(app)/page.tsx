@@ -44,7 +44,7 @@ export default async function Dashboard() {
               email underwriting dan WhatsApp PIC.
             </li>
             <li>
-              2. Tambahkan <Link className="font-semibold text-brand" href="/master/kategori">kategori polis</Link> dan{" "}
+              2. Periksa <Link className="font-semibold text-brand" href="/master/kategori">paket coverage</Link> (Biasa, Plus, Complete) dan tambahkan{" "}
               <Link className="font-semibold text-brand" href="/master/bengkel">bengkel</Link>.
             </li>
             <li>

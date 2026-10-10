@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { and, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { kendaraan, nasabah, perusahaanAsuransi, polis, users } from "@/db/schema";
+import { kategoriPolis, kendaraan, nasabah, perusahaanAsuransi, polis, users } from "@/db/schema";
 import { wajibLogin } from "@/lib/auth/session";
 import { Kartu, KepalaHalaman, Kosong, Lencana } from "@/components/ui";
 import { rupiah } from "@/lib/format";
@@ -30,6 +30,7 @@ export default async function DaftarPolis({ searchParams }: { searchParams: Prom
       nasabah: nasabah.nama,
       plat: kendaraan.noPolisi,
       asuransi: perusahaanAsuransi.nama,
+      paket: kategoriPolis.nama,
       sales: users.nama,
     })
     .from(polis)
@@ -37,6 +38,7 @@ export default async function DaftarPolis({ searchParams }: { searchParams: Prom
     .innerJoin(kendaraan, eq(kendaraan.id, polis.kendaraanId))
     .innerJoin(users, eq(users.id, polis.salesId))
     .leftJoin(perusahaanAsuransi, eq(perusahaanAsuransi.id, polis.perusahaanId))
+    .leftJoin(kategoriPolis, eq(kategoriPolis.id, polis.kategoriId))
     .where(
       and(
         inArray(polis.statusPengajuan, [...TERBIT]),
@@ -96,7 +98,8 @@ export default async function DaftarPolis({ searchParams }: { searchParams: Prom
                         {d.p.noPolis}
                       </Link>
                       <div className="text-xs text-ink-3">
-                        {d.asuransi} · {d.p.kode}
+                        {d.asuransi}
+                        {d.paket && ` ${d.paket}`} · {d.p.kode}
                       </div>
                     </td>
                     <td className="px-3 py-3">

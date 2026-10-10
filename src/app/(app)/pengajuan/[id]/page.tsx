@@ -91,11 +91,12 @@ export default async function DetailPengajuan({ params }: { params: Promise<{ id
         .where(eq(statusHistory.polisId, id))
         .orderBy(asc(statusHistory.waktu)),
       db
-        .select({ pw: penawaran, asuransi: perusahaanAsuransi.nama })
+        .select({ pw: penawaran, asuransi: perusahaanAsuransi.nama, paket: kategoriPolis.nama, cakupan: kategoriPolis.cakupan })
         .from(penawaran)
         .innerJoin(perusahaanAsuransi, eq(perusahaanAsuransi.id, penawaran.perusahaanId))
+        .leftJoin(kategoriPolis, eq(kategoriPolis.id, penawaran.kategoriId))
         .where(eq(penawaran.polisId, id))
-        .orderBy(asc(penawaran.premi)),
+        .orderBy(asc(perusahaanAsuransi.nama), asc(kategoriPolis.urutan), asc(penawaran.premi)),
       db
         .select({ l: kirimAsuransiLog, asuransi: perusahaanAsuransi.nama })
         .from(kirimAsuransiLog)
@@ -123,11 +124,7 @@ export default async function DetailPengajuan({ params }: { params: Promise<{ id
         .from(rekening)
         .where(and(eq(rekening.pemilikTipe, "pembayaran"), eq(rekening.aktif, true)))
         .orderBy(desc(rekening.utama)),
-      db
-        .select({ k: kategoriPolis, asuransi: perusahaanAsuransi.nama })
-        .from(kategoriPolis)
-        .innerJoin(perusahaanAsuransi, eq(perusahaanAsuransi.id, kategoriPolis.perusahaanId))
-        .where(eq(kategoriPolis.aktif, true)),
+      db.select().from(kategoriPolis).where(eq(kategoriPolis.aktif, true)).orderBy(asc(kategoriPolis.urutan)),
       trackerAktif(id),
       cekKelengkapan(p),
     ]);
@@ -140,7 +137,6 @@ export default async function DetailPengajuan({ params }: { params: Promise<{ id
   const waktuLangkah = new Map<StatusPengajuan, Date>();
   for (const r of riwayat) waktuLangkah.set(r.h.status, r.h.waktu);
   const ditutup = s === "selesai" || s === "ditolak_asuransi" || s === "batal_nasabah";
-  const perluasanSemua = [...new Set(kategori.flatMap((k) => k.k.perluasanTersedia))];
   const sebelumTerbit = (n ?? 0) < 7;
 
   // ─── Panel tindakan sesuai status & peran ───
@@ -171,25 +167,15 @@ export default async function DetailPengajuan({ params }: { params: Promise<{ id
         <FormAksi aksi={ubahDataPengajuan.bind(null, id)} tombol="Simpan data" varian="kedua">
           <div className="grid gap-3 sm:grid-cols-2">
             <Isian label="Nilai pertanggungan (Rp)" name="nilaiPertanggungan" inputMode="numeric" defaultValue={p.nilaiPertanggungan ?? ""} />
-            <Pilihan label="Produk diminta" name="kategoriId" defaultValue={p.kategoriId ?? ""}>
-              <option value="">Belum ditentukan</option>
-              {kategori.map(({ k, asuransi }) => (
+            <Pilihan label="Paket diminta" name="kategoriId" defaultValue={p.kategoriId ?? ""}>
+              <option value="">Belum ditentukan (minta semua paket)</option>
+              {kategori.map((k) => (
                 <option key={k.id} value={k.id}>
-                  {asuransi} — {k.namaProduk}
+                  {k.nama}
                 </option>
               ))}
             </Pilihan>
           </div>
-          {perluasanSemua.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {perluasanSemua.map((x) => (
-                <label key={x} className="flex items-center gap-2 rounded-full border border-line px-3 py-1 text-sm has-[:checked]:border-brand has-[:checked]:bg-brand-soft">
-                  <input type="checkbox" name="perluasanDiminta" value={x} defaultChecked={p.perluasanDiminta.includes(x)} className="accent-brand" />
-                  {x}
-                </label>
-              ))}
-            </div>
-          )}
         </FormAksi>
         <FormAksi aksi={ajukan.bind(null, id)} tombol="Ajukan ke admin">
           <p className="text-sm text-ink-2">Pengajuan pindah ke status Data lengkap dan admin bisa mengirimnya ke asuransi.</p>
@@ -212,7 +198,7 @@ export default async function DetailPengajuan({ params }: { params: Promise<{ id
                 {asuransiList.map(({ a, email, wa }) => (
                   <label key={a.id} className="flex items-center justify-between gap-2 rounded-xl border border-line px-3 py-2 text-sm has-[:checked]:border-ink">
                     <span className="flex items-center gap-2">
-                      <input type="checkbox" name="perusahaanId" value={a.id} defaultChecked={info.kat?.perusahaanId === a.id} className="accent-ink" />
+                      <input type="checkbox" name="perusahaanId" value={a.id} defaultChecked={asuransiList.length === 1} className="accent-ink" />
                       {a.nama}
                     </span>
                     <span className="flex gap-1">
@@ -271,12 +257,24 @@ export default async function DetailPengajuan({ params }: { params: Promise<{ id
                   </option>
                 ))}
               </Pilihan>
-              <Isian label="Premi bruto (Rp)" name="premi" inputMode="numeric" required />
-              <Isian label="Rate (%)" name="ratePersen" inputMode="decimal" />
               <Isian label="Cashback total dari asuransi (%)" name="cashbackTotalPersen" inputMode="decimal" required />
             </div>
-            <Isian label="Catatan" name="catatan" />
-            <InputFile label="File penawaran (opsional)" name="file" />
+            <fieldset className="flex flex-col gap-2">
+              <legend className="mb-1 text-[13px] font-semibold text-ink-2">Premi tahun pertama per paket (sesuai penawaran asuransi)</legend>
+              {kategori.map((k) => (
+                <label key={k.id} className="grid grid-cols-[110px_1fr] items-center gap-3 text-sm">
+                  <span className="font-semibold">{k.nama}</span>
+                  <input
+                    name={`premi_${k.id}`}
+                    inputMode="numeric"
+                    placeholder="Kosongkan bila tidak ditawarkan"
+                    className="h-11 rounded-xl border border-line-2 bg-white px-3.5 text-[15px] text-ink outline-none placeholder:text-ink-4 focus:border-brand focus:ring-4 focus:ring-brand-soft"
+                  />
+                </label>
+              ))}
+            </fieldset>
+            <Isian label="Catatan" name="catatan" placeholder="Mis. used car, TSI Rp 415.000.000, sudah termasuk biaya polis" />
+            <InputFile label="File penawaran dari asuransi (opsional)" name="file" />
           </FormAksi>
         </div>
       </details>,
@@ -289,13 +287,13 @@ export default async function DetailPengajuan({ params }: { params: Promise<{ id
         <h3 className="mb-3 text-sm font-bold">Persetujuan nasabah</h3>
         <PilihPenawaran
           aksi={setujuiPenawaran.bind(null, id)}
-          opsi={daftarPenawaran.map(({ pw, asuransi }) => ({
+          opsi={daftarPenawaran.map(({ pw, asuransi, paket, cakupan }) => ({
             id: pw.id,
             asuransi,
+            paket,
+            cakupan: cakupan ?? [],
             premi: pw.premi,
             cashbackTotalPersen: pw.cashbackTotalPersen,
-            ratePersen: pw.ratePersen,
-            dokumenId: pw.dokumenId,
           }))}
           maksCashback={info.sales.maksCashbackNasabahPersen}
           bagiHasilKantor={bh.persen}
@@ -454,12 +452,13 @@ export default async function DetailPengajuan({ params }: { params: Promise<{ id
             <Kartu className="flex flex-col gap-2">
               <h2 className="text-base font-bold">Penawaran</h2>
               <ul className="flex flex-col divide-y divide-line text-sm">
-                {daftarPenawaran.map(({ pw, asuransi }) => (
+                {daftarPenawaran.map(({ pw, asuransi, paket }) => (
                   <li key={pw.id} className="flex flex-wrap items-center justify-between gap-2 py-2.5">
                     <span>
-                      <b>{asuransi}</b> {pw.dipilih && <Lencana nada="ok">DIPILIH</Lencana>}
+                      <b>{asuransi}</b> {paket && <span className="font-semibold text-brand-ink">· {paket}</span>}{" "}
+                      {pw.dipilih && <Lencana nada="ok">DIPILIH</Lencana>}
                       <span className="block text-[13px] text-ink-3">
-                        {pw.ratePersen != null && `rate ${persen(pw.ratePersen)} · `}cashback {persen(pw.cashbackTotalPersen)}
+                        cashback {persen(pw.cashbackTotalPersen)}
                         {pw.catatan && ` · ${pw.catatan}`}
                         {pw.dokumenId && (
                           <>
@@ -504,6 +503,7 @@ export default async function DetailPengajuan({ params }: { params: Promise<{ id
             <section className="flex flex-col gap-3 rounded-[20px] bg-ink p-5 text-white">
               <span className="text-[11px] font-semibold tracking-[0.08em] text-[#A9B0C2]">
                 RINGKASAN {info.a ? `· ${info.a.nama.toUpperCase()}` : ""}
+                {info.kat && ` · PAKET ${info.kat.nama.toUpperCase()}`}
                 {info.ev && ` · EVENT ${info.ev.nama.toUpperCase()} (KOMISI +${persen(info.ev.tambahanKomisiPersen)})`}
               </span>
               <dl className="grid grid-cols-2 gap-y-1.5 text-sm">
@@ -572,10 +572,8 @@ export default async function DetailPengajuan({ params }: { params: Promise<{ id
             <dl className="grid grid-cols-[130px_1fr] gap-y-1.5 text-sm">
               <dt className="text-ink-3">Nilai pertanggungan</dt>
               <dd>{rupiah(p.nilaiPertanggungan)}</dd>
-              <dt className="text-ink-3">Produk diminta</dt>
-              <dd>{info.kat ? info.kat.namaProduk : "–"}</dd>
-              <dt className="text-ink-3">Perluasan</dt>
-              <dd>{p.perluasanDiminta.join(", ") || "–"}</dd>
+              <dt className="text-ink-3">{p.premiBruto != null ? "Paket" : "Paket diminta"}</dt>
+              <dd>{info.kat ? info.kat.nama : "Belum ditentukan"}</dd>
               {p.tglBayar && (
                 <>
                   <dt className="text-ink-3">Dibayar</dt>

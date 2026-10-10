@@ -5,9 +5,16 @@ import { FormAksi, type StateForm } from "@/components/form-aksi";
 import { hitungKomisi } from "@/lib/domain/komisi";
 import { rupiah, persen } from "@/lib/format";
 
-type Opsi = { id: string; asuransi: string; premi: number; cashbackTotalPersen: number; ratePersen: number | null; dokumenId: string | null };
+type Opsi = {
+  id: string;
+  asuransi: string;
+  paket: string | null;
+  cakupan: string[];
+  premi: number;
+  cashbackTotalPersen: number;
+};
 
-/** Pilih penawaran + atur cashback ke nasabah, dengan simulasi komisi langsung. */
+/** Pilih paket dari penawaran asuransi + atur cashback ke nasabah, dengan simulasi komisi langsung. */
 export function PilihPenawaran({
   aksi,
   opsi,
@@ -27,6 +34,7 @@ export function PilihPenawaran({
   const [cb, setCb] = useState(Math.min(15, maksCashback));
   const o = opsi.find((x) => x.id === pilih);
   const batas = o ? Math.min(maksCashback, o.cashbackTotalPersen) : maksCashback;
+  const perAsuransi = [...new Set(opsi.map((x) => x.asuransi))];
 
   let hasil: ReturnType<typeof hitungKomisi> | null = null;
   let galat: string | null = null;
@@ -46,26 +54,40 @@ export function PilihPenawaran({
 
   return (
     <FormAksi aksi={aksi} tombol="Nasabah setuju" className="flex flex-col gap-4">
-      <fieldset className="flex flex-col gap-2">
-        <legend className="mb-2 text-[13px] font-semibold text-ink-2">Penawaran yang disetujui nasabah</legend>
-        {opsi.map((x) => (
-          <label
-            key={x.id}
-            className="flex cursor-pointer flex-wrap items-center justify-between gap-2 rounded-2xl border border-line p-3 has-[:checked]:border-ink has-[:checked]:ring-1 has-[:checked]:ring-ink"
-          >
-            <span className="flex items-center gap-3">
-              <input type="radio" name="penawaranId" value={x.id} checked={pilih === x.id} onChange={() => setPilih(x.id)} className="accent-ink" />
-              <span>
-                <b>{x.asuransi}</b>
-                <span className="block text-[13px] text-ink-2">
-                  {x.ratePersen != null && `rate ${persen(x.ratePersen)} · `}cashback total {persen(x.cashbackTotalPersen)}
-                </span>
-              </span>
-            </span>
-            <span className="text-base font-extrabold">{rupiah(x.premi)}</span>
-          </label>
-        ))}
-      </fieldset>
+      {perAsuransi.map((a) => (
+        <fieldset key={a} className="flex flex-col gap-2">
+          <legend className="mb-2 text-[13px] font-semibold text-ink-2">
+            {a} · cashback total {persen(opsi.find((x) => x.asuransi === a)?.cashbackTotalPersen)}
+          </legend>
+          <div className="grid gap-2 sm:grid-cols-3">
+            {opsi
+              .filter((x) => x.asuransi === a)
+              .map((x) => (
+                <label
+                  key={x.id}
+                  className="flex cursor-pointer flex-col gap-1 rounded-2xl border border-line p-3 has-[:checked]:border-ink has-[:checked]:ring-1 has-[:checked]:ring-ink"
+                >
+                  <span className="flex items-center gap-2">
+                    <input type="radio" name="penawaranId" value={x.id} checked={pilih === x.id} onChange={() => setPilih(x.id)} className="accent-ink" />
+                    <b>{x.paket ?? "Penawaran"}</b>
+                  </span>
+                  <span className="text-base font-extrabold">{rupiah(x.premi)}</span>
+                </label>
+              ))}
+          </div>
+        </fieldset>
+      ))}
+
+      {o && o.cakupan.length > 0 && (
+        <div className="rounded-2xl bg-canvas p-3.5 text-[13px] text-ink-2">
+          <b className="text-ink">Paket {o.paket} menjamin:</b>
+          <ul className="mt-1 list-disc pl-5">
+            {o.cakupan.map((c) => (
+              <li key={c}>{c}</li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <label className="flex flex-col gap-1.5 text-[13px] font-semibold text-ink-2">
         Cashback ke nasabah (% premi) — maks {persen(batas)}
@@ -99,7 +121,7 @@ export function PilihPenawaran({
             {namaEvent && ` · EVENT ${namaEvent.toUpperCase()} +${persen(tambahanEvent)}`}
           </p>
           <dl className="grid grid-cols-2 gap-y-1 text-sm">
-            <dt className="text-[#A9B0C2]">Dibayar nasabah</dt>
+            <dt className="text-[#A9B0C2]">Dibayar nasabah ({o.paket})</dt>
             <dd className="text-right font-semibold">{rupiah(o.premi)}</dd>
             <dt className="text-[#A9B0C2]">Cashback total</dt>
             <dd className="text-right">{rupiah(hasil.cashbackTotalRp)}</dd>

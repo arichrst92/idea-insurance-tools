@@ -9,7 +9,6 @@ import { bengkel, kategoriPolis, kontakAsuransi, perusahaanAsuransi, rekening } 
 import { wajibLogin } from "@/lib/auth/session";
 import { catatAudit } from "@/lib/audit";
 import { normalisasiNoWa } from "@/lib/wa";
-import { parsePersen } from "@/lib/format";
 import { pelanggaranUnik } from "@/db/errors";
 import type { StateForm } from "@/components/form-aksi";
 
@@ -117,33 +116,36 @@ export async function hapusKontak(perusahaanId: string, kontakId: string) {
   revalidatePath(`/master/asuransi/${perusahaanId}`);
 }
 
-// ─── Kategori polis ───
+// ─── Paket coverage (Biasa / Plus / Complete) ───
 
-export async function tambahKategori(_: StateForm, form: FormData): Promise<StateForm> {
+export async function simpanPaket(id: string | null, _: StateForm, form: FormData): Promise<StateForm> {
   const { user } = await wajibLogin("admin");
   const p = z
     .object({
-      perusahaanId: z.string().min(1, "Pilih asuransi"),
-      namaProduk: z.string().min(2, "Nama produk wajib diisi"),
-      jenis: z.enum(["All Risk", "TLO"]),
-      rateDasarPersen: z.number().min(0).max(100).nullable(),
-      perluasanTersedia: z.array(z.string()),
+      nama: z.string().min(2, "Nama paket wajib diisi").max(40),
+      cakupan: z.array(z.string()).min(1, "Isi minimal satu risiko yang dijamin"),
+      urutan: z.number().int().min(0).max(99),
     })
     .safeParse({
-      perusahaanId: teks(form, "perusahaanId"),
-      namaProduk: teks(form, "namaProduk"),
-      jenis: teks(form, "jenis"),
-      rateDasarPersen: teks(form, "rateDasarPersen") ? parsePersen(teks(form, "rateDasarPersen")) : null,
-      perluasanTersedia: teks(form, "perluasan")
-        .split(",")
-        .map((s) => s.trim())
+      nama: teks(form, "nama"),
+      cakupan: teks(form, "cakupan")
+        .split("\n")
+        .map((s) => s.replace(/^[-•*]\s*/, "").trim())
         .filter(Boolean),
+      urutan: Number(teks(form, "urutan") || 0),
     });
-  if (!p.success) return { error: pesanZod(p.error) };
-  const [k] = await db.insert(kategoriPolis).values(p.data).returning({ id: kategoriPolis.id });
-  await catatAudit({ userId: user.id, aksi: "tambah", tabel: "kategori_polis", recordId: k.id, detail: p.data });
+  if (!p.success) return { error: p.error.issues[0]?.message };
+
+  const sama = await db.select({ id: kategoriPolis.id, nama: kategoriPolis.nama }).from(kategoriPolis);
+  if (sama.some((k) => k.id !== id && k.nama.toLowerCase() === p.data.nama.toLowerCase()))
+    return { error: `Paket "${p.data.nama}" sudah ada` };
+
+  let recordId = id;
+  if (id) await db.update(kategoriPolis).set(p.data).where(eq(kategoriPolis.id, id));
+  else [{ id: recordId }] = await db.insert(kategoriPolis).values(p.data).returning({ id: kategoriPolis.id });
+  await catatAudit({ userId: user.id, aksi: id ? "ubah" : "tambah", tabel: "kategori_polis", recordId, detail: p.data });
   revalidatePath("/master/kategori");
-  return { ok: "Kategori ditambahkan" };
+  return { ok: id ? "Paket tersimpan" : "Paket ditambahkan" };
 }
 
 export async function ubahAktifKategori(id: string, aktif: boolean) {
