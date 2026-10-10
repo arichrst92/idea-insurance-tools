@@ -172,3 +172,42 @@ describe("template pesan", () => {
     expect(rapikan(renderTemplate("Halo {sapaan} {nama}, ok", { sapaan: "", nama: "PT Maju" }).replace("{sapaan}", ""))).toBe("Halo PT Maju, ok");
   });
 });
+
+import { cocokCron, maksudBalasan, sisaHari, tahapRemind, tambahHari, waktuWib } from "./perpanjangan";
+
+describe("perpanjangan", () => {
+  it("sisa hari", () => {
+    expect(sisaHari("2026-11-09", "2026-10-10")).toBe(30);
+    expect(sisaHari("2026-10-09", "2026-10-10")).toBe(-1);
+    expect(tambahHari("2026-12-31", 1)).toBe("2027-01-01");
+  });
+  it.each([
+    [45, [], null],
+    [30, [], 30],
+    [29, [30], null],
+    [14, [30], 14],
+    [12, [30], 14], // H-14 terlewat → tetap dikirim sekali
+    [12, [30, 14], null],
+    [7, [30, 14], 7],
+    [3, [30, 14], 7], // tidak menyusulkan tahap lama berulang
+    [0, [30, 14, 7], null],
+    [-1, [], null],
+  ])("sisa %i, sudah %j → tahap %s", (sisa, sudah, hasil) => {
+    expect(tahapRemind(sisa, [30, 14, 7], sudah)).toBe(hasil);
+  });
+  it("cron WIB", () => {
+    const w = waktuWib(new Date("2026-10-09T23:00:00Z")); // Sabtu 10 Okt 06.00 WIB
+    expect(w).toMatchObject({ tanggal: "2026-10-10", jam: 6, menit: 0, hariMinggu: 6 });
+    expect(cocokCron("0 6 * * *", w)).toBe(true);
+    expect(cocokCron("0 9 * * *", w)).toBe(false);
+    expect(cocokCron("0 10 * * 5", w)).toBe(false);
+    expect(cocokCron("*/15 6 * * 1-6", w)).toBe(true);
+    expect(cocokCron("30 0 1 * *", { ...w, jam: 0, menit: 30, tgl: 1 })).toBe(true);
+  });
+  it("balasan nasabah", () => {
+    expect(maksudBalasan(" YA ")).toBe("setuju");
+    expect(maksudBalasan("*Ya*")).toBe("setuju");
+    expect(maksudBalasan("Berhenti")).toBe("berhenti");
+    expect(maksudBalasan("ya nanti saya kabari")).toBeNull();
+  });
+});

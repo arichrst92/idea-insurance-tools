@@ -3,8 +3,13 @@ import { and, asc, desc, eq, sql } from "drizzle-orm";
 import clsx from "clsx";
 import { db } from "@/db";
 import {
+  bengkel,
   dokumen,
   eventBagiHasil,
+  klaim,
+  polis,
+  remindPerpanjangan,
+  waLog,
   kategoriPolis,
   kendaraan,
   kirimAsuransiLog,
@@ -28,6 +33,10 @@ import { persen, rupiah } from "@/lib/format";
 import { cekKelengkapan, trackerAktif, urlTracker, MIN_FOTO_KENDARAAN } from "@/lib/pengajuan";
 import { PilihPenawaran } from "./pilih-penawaran";
 import { RincianKomisi } from "@/components/rincian-komisi";
+import { MASA_PERLU_DIURUS, STATUS_TERBIT, perpanjanganDari } from "@/lib/perpanjangan";
+import { sisaHari, waktuWib } from "@/lib/domain/perpanjangan";
+import { perpanjang, remindManual } from "../../perpanjangan/actions";
+import { LABEL_KLAIM } from "../../klaim/galeri";
 import { FormPenawaran } from "./form-penawaran";
 import {
   ajukan,
@@ -133,6 +142,36 @@ export default async function DetailPengajuan({ params }: { params: Promise<{ id
       trackerAktif(id),
       cekKelengkapan(p),
     ]);
+  const terbit = (STATUS_TERBIT as readonly string[]).includes(s);
+  const [polisLama, lanjutan, riwayatRemind, daftarKlaim] = await Promise.all([
+    p.polisSebelumnyaId
+      ? db.select({ id: polis.id, noPolis: polis.noPolis, kode: polis.kode, tglAkhir: polis.tglAkhir }).from(polis).where(eq(polis.id, p.polisSebelumnyaId)).then((r) => r[0] ?? null)
+      : Promise.resolve(null),
+    terbit ? perpanjanganDari(id) : Promise.resolve(null),
+    terbit
+      ? db
+          .select({ r: remindPerpanjangan, status: waLog.status, oleh: users.nama })
+          .from(remindPerpanjangan)
+          .leftJoin(waLog, eq(waLog.id, remindPerpanjangan.waLogId))
+          .leftJoin(users, eq(users.id, remindPerpanjangan.oleh))
+          .where(eq(remindPerpanjangan.polisId, id))
+          .orderBy(desc(remindPerpanjangan.dibuat))
+      : Promise.resolve([]),
+    terbit
+      ? db
+          .select({
+            k: klaim,
+            bengkel: bengkel.nama,
+            foto: sql<number>`(select count(*) from dokumen d where d.pemilik_tipe = 'klaim' and d.pemilik_id = ${klaim.id})`.mapWith(Number),
+          })
+          .from(klaim)
+          .leftJoin(bengkel, eq(bengkel.id, klaim.bengkelId))
+          .where(eq(klaim.polisId, id))
+          .orderBy(desc(klaim.tglKlaim))
+      : Promise.resolve([]),
+  ]);
+  const sisa = p.tglAkhir ? sisaHari(p.tglAkhir, waktuWib().tanggal) : null;
+  const masaDiurus = terbit && !!p.statusMasa && (MASA_PERLU_DIURUS as readonly string[]).includes(p.statusMasa);
 
   const events = s === "penawaran_masuk" ? await db.select().from(eventBagiHasil).where(eq(eventBagiHasil.aktif, true)) : [];
   const bh = bagiHasilBerlaku(info.sales, p.tglInput.toISOString().slice(0, 10), events);
@@ -480,6 +519,17 @@ export default async function DetailPengajuan({ params }: { params: Promise<{ id
         }
       />
       <BarJourney status={s} terakhir={terakhirLangkah} />
+      {polisLama && (
+        <p className="-mt-2 flex flex-wrap items-center gap-2 rounded-2xl border border-brand-soft bg-brand-soft/40 px-4 py-2.5 text-sm" data-uji="banner-perpanjangan">
+          <Lencana nada="brand">PERPANJANGAN</Lencana>
+          dari polis
+          <Link href={`/pengajuan/${polisLama.id}`} className="font-semibold text-brand">
+            {polisLama.noPolis ?? polisLama.kode}
+          </Link>
+          {polisLama.tglAkhir && <span className="text-ink-3">(berakhir {polisLama.tglAkhir})</span>}
+          {p.nasabahSetujuPerpanjangan && <Lencana nada="ok">NASABAH SETUJU VIA WHATSAPP</Lencana>}
+        </p>
+      )}
 
       <div className="grid items-start gap-4 lg:grid-cols-[1.25fr_1fr]">
         <div className="flex flex-col gap-4">
@@ -613,6 +663,83 @@ export default async function DetailPengajuan({ params }: { params: Promise<{ id
                 </p>
               )}
             </section>
+          )}
+
+          {terbit && (
+            <Kartu className="flex flex-col gap-3" data-uji="kartu-masa">
+              <div className="flex items-baseline justify-between gap-2">
+                <h2 className="text-base font-bold">Masa polis & perpanjangan</h2>
+                {sisa !== null && p.statusMasa !== "diperpanjang" && (
+                  <span className={`text-sm font-bold ${sisa < 0 ? "text-bad" : sisa <= 30 ? "text-warn" : "text-ink-2"}`}>
+                    {sisa < 0 ? `lewat ${-sisa} hari` : `${sisa} hari lagi`}
+                  </span>
+                )}
+              </div>
+              <p className="text-sm text-ink-2">
+                {p.tglMulai} s/d {p.tglAkhir}
+                {p.statusMasa === "diperpanjang" && " · sudah diperpanjang"}
+              </p>
+              {lanjutan ? (
+                <Link href={`/pengajuan/${lanjutan.id}`} className="flex flex-wrap items-center gap-2 rounded-2xl bg-canvas px-3 py-2 text-sm font-semibold hover:text-brand">
+                  Perpanjangan {lanjutan.kode}
+                  <LencanaStatus status={lanjutan.statusPengajuan} />
+                  {lanjutan.nasabahSetujuPerpanjangan && <Lencana nada="ok">NASABAH SETUJU</Lencana>}
+                </Link>
+              ) : (
+                masaDiurus && (
+                  <div className="flex flex-wrap items-start gap-2">
+                    <FormAksi aksi={perpanjang.bind(null, id)} tombol="Perpanjang" className="flex flex-col gap-1">
+                      {null}
+                    </FormAksi>
+                    <FormAksi aksi={remindManual.bind(null, id)} tombol="Remind WhatsApp" varian="kedua" className="flex flex-col gap-1">
+                      {null}
+                    </FormAksi>
+                  </div>
+                )
+              )}
+              {riwayatRemind.length > 0 && (
+                <ul className="flex flex-col gap-1 border-t border-line pt-2 text-[13px] text-ink-2">
+                  {riwayatRemind.map(({ r, status, oleh }) => (
+                    <li key={r.id} className="flex justify-between gap-2">
+                      <span>
+                        Remind {r.tahap ? `H-${r.tahap} (otomatis)` : `manual${oleh ? ` · ${oleh}` : ""}`}
+                      </span>
+                      <span className="text-ink-3">
+                        {r.dibuat.toLocaleDateString("id-ID", { timeZone: "Asia/Jakarta" })} · {r.kanal === "optout" ? "tidak dikirim (berhenti)" : r.kanal === "wame" ? "wa.me" : (status ?? "-")}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Kartu>
+          )}
+
+          {terbit && (
+            <Kartu className="flex flex-col gap-3">
+              <div className="flex items-baseline justify-between gap-2">
+                <h2 className="text-base font-bold">Klaim</h2>
+                <Link href={`/klaim/baru?polis=${id}`} className="text-sm font-semibold text-brand">
+                  + Catat klaim
+                </Link>
+              </div>
+              {daftarKlaim.length === 0 ? (
+                <p className="text-sm text-ink-3">Belum ada klaim.</p>
+              ) : (
+                <ul className="flex flex-col divide-y divide-line text-sm">
+                  {daftarKlaim.map(({ k, bengkel: b, foto }) => (
+                    <li key={k.id}>
+                      <Link href={`/klaim/${k.id}`} className="flex items-center justify-between gap-2 py-2 hover:text-brand">
+                        <span>
+                          {k.tglKlaim}
+                          {b && ` · ${b}`} · {foto} foto
+                        </span>
+                        <Lencana nada={LABEL_KLAIM[k.status][1]}>{LABEL_KLAIM[k.status][0]}</Lencana>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Kartu>
           )}
 
           <Kartu className="flex flex-col gap-3">

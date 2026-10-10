@@ -39,6 +39,16 @@ const TEMPLATE_WA = [
     isi: "Halo {sapaan} {nama}, polis asuransi mobil {kendaraan} {no_polisi} akan berakhir {tgl_akhir} ({sisa_hari} hari lagi). Balas *YA* bila ingin kami siapkan perpanjangannya. Balas BERHENTI untuk tidak menerima pengingat ini.\n— {nama_sales}",
   },
   {
+    kode: "konfirmasi_perpanjangan",
+    nama: "Balasan: nasabah setuju perpanjangan",
+    isi: "Terima kasih {sapaan} {nama}, permintaan perpanjangan polis {no_polisi} sudah kami terima. {nama_sales} akan segera menghubungi {sapaan} dengan penawaran terbaru.",
+  },
+  {
+    kode: "konfirmasi_berhenti",
+    nama: "Balasan: berhenti remind",
+    isi: "Baik {sapaan} {nama}, {sapaan} tidak akan menerima pengingat perpanjangan lagi. Hubungi {nama_sales} bila berubah pikiran.",
+  },
+  {
     kode: "tracker",
     nama: "Link tracker pengajuan",
     isi: "Halo {sapaan} {nama}, status pengajuan asuransi mobil {kendaraan} {no_polisi} bisa {sapaan} pantau kapan saja di link berikut: {link_tracker}\nLink ini khusus untuk {sapaan}, mohon tidak dibagikan.\n— {nama_sales}",
@@ -59,6 +69,7 @@ const TEMPLATE_WA = [
 
 const OTOMASI = [
   { kode: "draft_perpanjangan", nama: "Draft perpanjangan", jadwalCron: "0 6 * * *", parameter: { hariSebelum: 45 } },
+  { kode: "remind_perpanjangan", nama: "Remind perpanjangan (WhatsApp)", jadwalCron: "0 9 * * *", parameter: { hari: [30, 14, 7] } },
   { kode: "alert_mandek", nama: "Alert pengajuan mandek", jadwalCron: "0 8 * * *", parameter: { hari: 3, hariCepat: 2, eskalasiAdmin: 7 } },
   { kode: "tagih_cashback", nama: "Pengingat penagihan cashback", jadwalCron: "0 9 * * *", parameter: { jedaHari: 7 } },
   { kode: "rekap_komisi", nama: "Rekap komisi siap bayar", jadwalCron: "0 10 * * 5", parameter: {} },

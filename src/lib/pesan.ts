@@ -6,11 +6,11 @@ import { kirimWa } from "@/lib/fonnte";
 import { linkWaMe } from "@/lib/wa";
 import { rapikan, renderTemplate } from "@/lib/domain/template";
 
-export type JenisPesan = "instruksi_bayar" | "remind" | "notifikasi" | "kirim_asuransi" | "tracker";
+export type JenisPesan = "instruksi_bayar" | "remind" | "notifikasi" | "kirim_asuransi" | "tracker" | "balasan";
 
 export type HasilPesan =
-  | { kanal: "fonnte"; ok: true }
-  | { kanal: "wame"; url: string; alasan: string }
+  | { kanal: "fonnte"; ok: true; logId: string }
+  | { kanal: "wame"; url: string; alasan: string; logId: string }
   | { kanal: "optout" };
 
 /** Ambil & isi template WhatsApp (tabel wa_template, bisa diedit admin). */
@@ -45,7 +45,7 @@ export async function kirimPesan(p: {
   }
 
   const hasil = await kirimWa({ target: p.ke, message: p.isi, url: p.lampiranUrl, filename: p.namaLampiran });
-  await db.insert(waLog).values({
+  const [log] = await db.insert(waLog).values({
     polisId: p.polisId ?? null,
     userId: p.userId ?? null,
     nomorTujuan: p.ke,
@@ -55,10 +55,10 @@ export async function kirimPesan(p: {
     status: hasil.ok ? "terkirim" : "antre",
     lampiran: p.lampiranUrl ?? null,
     isi: p.isi,
-  });
-  if (hasil.ok) return { kanal: "fonnte", ok: true };
+  }).returning({ id: waLog.id });
+  if (hasil.ok) return { kanal: "fonnte", ok: true, logId: log.id };
 
   // Cadangan wa.me tidak bisa melampirkan file → sertakan link unduh di teks.
   const teks = p.lampiranUrl ? `${p.isi}\n\nFile: ${p.lampiranUrl}` : p.isi;
-  return { kanal: "wame", url: linkWaMe(p.ke, teks), alasan: hasil.alasan };
+  return { kanal: "wame", url: linkWaMe(p.ke, teks), alasan: hasil.alasan, logId: log.id };
 }

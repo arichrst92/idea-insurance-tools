@@ -49,6 +49,22 @@ docker compose --profile prod run --rm migrate npx tsx scripts/seed.ts   # sekal
 
 Aplikasi listen di `127.0.0.1:3000`; Nginx di host meneruskan `insurance.ide.asia` ke sana dengan SSL (Certbot). Set `client_max_body_size 50m;` di blok server Nginx agar upload beberapa file sekaligus tidak ditolak.
 
+## Otomasi & webhook WhatsApp
+
+Otomasi harian berjalan di dalam app (penjadwal per menit, zona WIB) sesuai jadwal di tabel `otomasi_setting`:
+draft perpanjangan 06.00 (H-45) dan remind perpanjangan 09.00 (H-30/H-14/H-7). Bisa juga dipicu manual:
+
+```bash
+curl -X POST -H "Authorization: Bearer $CRON_SECRET" https://insurance.ide.asia/api/cron/remind_perpanjangan
+```
+
+Di dashboard Fonnte (Device → Webhook) isi, dengan `FONNTE_WEBHOOK_SECRET` dari `.env`:
+
+| Webhook | URL |
+| --- | --- |
+| Pesan masuk | `https://insurance.ide.asia/api/webhook/fonnte?k=<FONNTE_WEBHOOK_SECRET>` |
+| Status pesan | `https://insurance.ide.asia/api/webhook/fonnte-status?k=<FONNTE_WEBHOOK_SECRET>` |
+
 ## Struktur
 
 ```
@@ -61,6 +77,8 @@ src/
       nasabah/        Nasabah, kendaraan, dokumen, rekening cashback
       pengajuan/      Journey 12 langkah, kirim ke asuransi, penawaran, polis, pembayaran
       polis/, event/  Daftar polis terbit, event bagi hasil
+      perpanjangan/   Polis akan habis, remind & perpanjang
+      klaim/          Catat klaim + foto, status
       verifikasi/     OTP ulang untuk tindakan sensitif (> 12 jam)
     t/[token]/        Halaman tracker publik untuk nasabah
     p/[kode]/         Link unduh berbatas waktu (PDF polis, dokumen untuk PIC)
@@ -68,6 +86,8 @@ src/
   lib/domain/         Rumus bisnis murni + test: komisi, event bagi hasil, gaji, journey
   lib/auth/           OTP, sesi, hash
   lib/fonnte.ts       Klien WhatsApp Fonnte
+  lib/wa-masuk.ts     Balasan nasabah (YA / BERHENTI / bukti transfer) dari webhook Fonnte
+  lib/otomasi.ts      Otomasi terjadwal + log; penjadwal di instrumentation.ts
   middleware.ts       Arahkan tamu ke /login, perpanjang cookie "ingat perangkat"
 ```
 
@@ -76,7 +96,7 @@ src/
 - [x] **Sprint 1 — Fondasi & login**: repo, skema database lengkap, Docker, CI, login OTP + sesi persisten, role admin/sales, dock & breadcrumb, master asuransi (+ kontak email & WA PIC), kategori polis, bengkel, rekening kantor, form sales (fulltime/freelance, target bulanan, gaji pokok, bagi hasil, maks cashback, rekening)
 - [x] **Sprint 2 — Nasabah & kendaraan**: daftar + cari (nama, no. WA, plat) + filter, tambah/ubah nasabah & kendaraan, data dibatasi per sales, upload KTP/STNK/foto (filesystem privat, lewat /api/dokumen), rekening cashback nasabah, tandai kendaraan dijual/tidak dipakai, pindah kepemilikan, nonaktifkan/aktifkan sales + pengalihan nasabah
 - [x] **Sprint 3 — Pengajuan, polis & cashback**: journey 12 status + riwayat, cek kelengkapan dokumen, kirim data ke asuransi (email SendGrid + WhatsApp Fonnte ke PIC master), penawaran, persetujuan nasabah + hitung komisi (event otomatis, komisi dasar & tambahan event dipisah), polis terbit + PDF, instruksi bayar dengan PDF terlampir (cadangan wa.me), lunas + bukti, setor/cair/transfer → selesai, revisi/tolak/batal, notifikasi giliran sales, event bagi hasil, daftar polis, link tracker nasabah publik (/t): nasabah memilih paket coverage dari penawaran, upload bukti transfer (dilihat sales/admin untuk ditandai lunas), unduh PDF dengan 4 digit WA
-- [ ] Sprint 4 — Perpanjangan & klaim
+- [x] **Sprint 4 — Perpanjangan & klaim**: halaman polis akan habis (H-7/14/30/45, lewat masa), remind WhatsApp otomatis H-30/H-14/H-7 + tombol remind manual dengan status pesan (terkirim/diterima/dibaca), draft perpanjangan otomatis H-45, perpanjang dari polis lama (polis lama jadi "diperpanjang" saat perpanjangan terbit), balasan nasabah via webhook Fonnte (YA = setuju perpanjangan, BERHENTI = stop remind, foto = bukti transfer, lainnya diteruskan ke sales), catat klaim + foto + status, ringkasan di dashboard
 - [ ] Sprint 5 — Laporan & pencairan
 - [ ] Sprint 6 — Keuangan & ekspor PDF
 - [ ] Sprint 7 — UAT & go-live

@@ -6,7 +6,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 const NAMA_COOKIE = "ria_sid";
 const UMUR_DETIK = 30 * 24 * 60 * 60;
-const PUBLIK = ["/login", "/t/", "/p/", "/api/webhook/"];
+const PUBLIK = ["/login", "/t/", "/p/", "/api/webhook/", "/api/cron/"];
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;

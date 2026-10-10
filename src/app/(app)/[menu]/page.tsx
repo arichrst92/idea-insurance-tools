@@ -3,8 +3,6 @@ import { Kartu, KepalaHalaman } from "@/components/ui";
 
 // Halaman sementara untuk menu dock yang dibangun di sprint berikutnya.
 const SEGERA: Record<string, { judul: string; sprint: number }> = {
-  perpanjangan: { judul: "Perpanjangan", sprint: 4 },
-  klaim: { judul: "Klaim", sprint: 4 },
   laporan: { judul: "Laporan", sprint: 5 },
   pencairan: { judul: "Pencairan", sprint: 5 },
   performa: { judul: "Performa", sprint: 5 },

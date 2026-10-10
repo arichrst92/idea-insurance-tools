@@ -107,7 +107,6 @@ export async function buatPengajuan(_: StateForm, f: FormData): Promise<StateFor
         kendaraanId: k.id,
         salesId: n.salesId,
         nilaiPertanggungan: nilai,
-        polisSebelumnyaId: opsional(f, "polisSebelumnyaId"),
       })
       .returning({ id: polis.id });
     await tx.insert(statusHistory).values({ polisId: p.id, status: "draft_prospek", oleh: user.id, catatan: "Pengajuan dibuat" });
@@ -532,15 +531,17 @@ export async function terbitkanPolis(id: string, _: StateForm, f: FormData): Pro
 
   return jalankan(async () => {
     await simpanDokumenPolis(f, "filePolis", id, "polis", user.id);
-    await db.transaction((tx) =>
-      ubahStatus(tx, {
+    await db.transaction(async (tx) => {
+      await ubahStatus(tx, {
         polisId: id,
         ke: "polis_terbit",
         oleh: user.id,
         catatan: `No. polis ${noPolis}`,
         patch: { noPolis, tglMulai, tglAkhir, batasBayar, rekeningPembayaranId: r.id },
-      }),
-    );
+      });
+      // Perpanjangan terbit → polis lama selesai diurus.
+      if (p.polisSebelumnyaId) await tx.update(polis).set({ statusMasa: "diperpanjang" }).where(eq(polis.id, p.polisSebelumnyaId));
+    });
     if (f.get("kirimOtomatis") === "on") {
       const h = await prosesInstruksi(id, user.id);
       segarkan(id);

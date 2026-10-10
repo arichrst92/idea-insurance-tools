@@ -19,6 +19,7 @@ import { labelStatus, samarkanPlat, transisiSah } from "@/lib/domain/journey";
 import { isiTemplate, kirimPesan } from "@/lib/pesan";
 import { rupiah } from "@/lib/format";
 import { tokenPendek } from "@/lib/id";
+import { sisaHari, waktuWib } from "@/lib/domain/perpanjangan";
 
 type Tx = Parameters<Parameters<typeof Db.transaction>[0]>[0];
 export type Polis = typeof polis.$inferSelect;
@@ -169,6 +170,8 @@ export async function varsPesanNasabah(polisId: string) {
       link_tracker: urlTracker(tracker.token),
       nama_sales: b.s.nama,
       kode: b.p.kode,
+      tgl_akhir: tgl(b.p.tglAkhir),
+      sisa_hari: b.p.tglAkhir ? sisaHari(b.p.tglAkhir, waktuWib().tanggal) : "",
     },
   };
 }

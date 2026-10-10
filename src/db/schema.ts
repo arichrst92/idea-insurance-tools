@@ -101,6 +101,7 @@ export const statusWaEnum = pgEnum("status_wa", ["antre", "terkirim", "diterima"
 export const formatEksporEnum = pgEnum("format_ekspor", ["pdf", "excel"]);
 export const statusJobEnum = pgEnum("status_job", ["antre", "proses", "selesai", "gagal"]);
 export const statusOtomasiEnum = pgEnum("status_otomasi", ["sukses", "gagal"]);
+export const statusKlaimEnum = pgEnum("status_klaim", ["diproses", "selesai", "ditolak"]);
 export const jenisJadwalBayarEnum = pgEnum("jenis_jadwal_bayar", ["cashback_nasabah", "komisi", "gaji"]);
 export const statusJadwalBayarEnum = pgEnum("status_jadwal_bayar", [
   "terjadwal",
@@ -374,6 +375,9 @@ export const polis = pgTable(
     /** Bagian dari komisiSalesRp yang berasal dari event; komisi dasar = komisiSalesRp − ini */
     komisiEventRp: rupiah(),
 
+    /** Draft perpanjangan: nasabah membalas "YA" pada remind WhatsApp */
+    nasabahSetujuPerpanjangan: waktu(),
+
     /** Paket yang dipilih nasabah sendiri lewat link tracker (dikonfirmasi sales) */
     pilihanNasabahId: text().references((): AnyPgColumn => penawaran.id, { onDelete: "set null" }),
     pilihanNasabahWaktu: waktu(),
@@ -506,8 +510,30 @@ export const klaim = pgTable("klaim", {
   tglKlaim: tanggal().notNull(),
   bengkelId: text().references(() => bengkel.id),
   catatan: text(),
+  status: statusKlaimEnum().notNull().default("diproses"),
+  dicatatOleh: text().references(() => users.id),
   dibuat: dibuat(),
+  diubah: dibuat().$onUpdate(() => new Date()),
 });
+
+/** Remind perpanjangan yang sudah dikirim (otomatis per tahap H-30/H-14/H-7, atau manual). */
+export const remindPerpanjangan = pgTable(
+  "remind_perpanjangan",
+  {
+    id: id(),
+    polisId: text()
+      .notNull()
+      .references(() => polis.id),
+    /** Tahap otomatis (30/14/7); null = dikirim manual */
+    tahap: integer(),
+    waLogId: text().references(() => waLog.id),
+    /** fonnte | wame | optout */
+    kanal: text().notNull(),
+    oleh: text().references(() => users.id),
+    dibuat: dibuat(),
+  },
+  (t) => [index().on(t.polisId)],
+);
 
 export const dokumen = pgTable(
   "dokumen",

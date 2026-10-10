@@ -1,10 +1,11 @@
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { dokumen, kendaraan, nasabah, polis } from "@/db/schema";
+import { dokumen, kendaraan, klaim, nasabah, polis } from "@/db/schema";
 import { sesiSekarang } from "@/lib/auth/session";
 import { bacaFile, tipeKonten } from "@/lib/storage";
 
-// Unduh/lihat dokumen privat. Admin: semua. Sales: hanya dokumen nasabah miliknya.
+// Unduh/lihat dokumen privat. Admin: semua. Sales: hanya dokumen nasabah miliknya
+// (dokumen polis & klaim: polis yang dipegang sales itu).
 export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
   const s = await sesiSekarang();
   if (!s) return new Response("Harus login", { status: 401 });
@@ -20,18 +21,23 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
       const [k] = await db.select({ n: kendaraan.nasabahId }).from(kendaraan).where(eq(kendaraan.id, d.pemilikId));
       nasabahId = k?.n ?? null;
     }
-    if (d.pemilikTipe === "polis") {
-      const [p] = await db.select({ n: polis.nasabahId, s: polis.salesId }).from(polis).where(eq(polis.id, d.pemilikId));
+    if (d.pemilikTipe === "polis" || d.pemilikTipe === "klaim") {
+      const polisId =
+        d.pemilikTipe === "polis"
+          ? d.pemilikId
+          : (await db.select({ p: klaim.polisId }).from(klaim).where(eq(klaim.id, d.pemilikId)))[0]?.p;
+      const [p] = polisId ? await db.select({ n: polis.nasabahId, s: polis.salesId }).from(polis).where(eq(polis.id, polisId)) : [];
       if (!p || p.s !== s.user.id) return new Response("Tidak ditemukan", { status: 404 });
       nasabahId = p.n;
     }
-    const [milik] = nasabahId && d.pemilikTipe !== "polis"
+    const lewatPolis = d.pemilikTipe === "polis" || d.pemilikTipe === "klaim";
+    const [milik] = nasabahId && !lewatPolis
       ? await db
           .select({ id: nasabah.id })
           .from(nasabah)
           .where(and(eq(nasabah.id, nasabahId), eq(nasabah.salesId, s.user.id)))
       : [];
-    if (!milik && d.pemilikTipe !== "polis") return new Response("Tidak ditemukan", { status: 404 });
+    if (!milik && !lewatPolis) return new Response("Tidak ditemukan", { status: 404 });
   }
 
   const isi = await bacaFile(d.fileKey);
