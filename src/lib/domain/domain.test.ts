@@ -4,6 +4,7 @@ import { hitungGaji, pencapaianPersen } from "./gaji";
 import { langkahNasabah, nomorLangkah, samarkanPlat, transisiSah } from "./journey";
 import { normalisasiNoWa } from "../wa";
 import { normalisasiPlat } from "./kendaraan";
+import { rapikan, renderTemplate } from "./template";
 
 describe("hitungKomisi — contoh di dokumen", () => {
   const dasar = {
@@ -137,4 +138,13 @@ describe("normalisasiPlat", () => {
     ["L 1", "L 1"],
   ])("%s → %s", (a, b) => expect(normalisasiPlat(a)).toBe(b));
   it.each(["1234", "ABC 1234 D", "D 12345 A", ""])("menolak %s", (a) => expect(normalisasiPlat(a)).toBeNull());
+});
+
+describe("template pesan", () => {
+  it("mengisi variabel, membiarkan yang tidak dikenal", () => {
+    expect(renderTemplate("Halo {sapaan} {nama}, {x}", { sapaan: "Bapak/Ibu", nama: "Budi" })).toBe("Halo Bapak/Ibu Budi, {x}");
+  });
+  it("sapaan kosong untuk badan usaha dirapikan", () => {
+    expect(rapikan(renderTemplate("Halo {sapaan} {nama}, ok", { sapaan: "", nama: "PT Maju" }).replace("{sapaan}", ""))).toBe("Halo PT Maju, ok");
+  });
 });

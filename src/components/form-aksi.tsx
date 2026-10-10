@@ -3,7 +3,12 @@
 import { useActionState, useEffect, useRef, startTransition, type FormEvent, type ReactNode } from "react";
 import { Pesan, Tombol } from "./ui";
 
-export type StateForm = { error?: string; ok?: string };
+export type StateForm = {
+  error?: string;
+  ok?: string;
+  /** URL yang dibuka di tab baru setelah aksi (mis. wa.me cadangan bila Fonnte gagal). */
+  bukaUrl?: string;
+};
 
 /**
  * Jalankan server action lewat onSubmit (bukan prop `action`) supaya React
@@ -39,6 +44,7 @@ export function FormAksi({
   const ref = useRef<HTMLFormElement>(null);
   useEffect(() => {
     if (resetSetelahOk && state.ok) ref.current?.reset();
+    if (state.bukaUrl) window.open(state.bukaUrl, "_blank", "noopener");
   }, [state, resetSetelahOk]);
 
   return (

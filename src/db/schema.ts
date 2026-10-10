@@ -16,6 +16,7 @@ import {
   jsonb,
   index,
   uniqueIndex,
+  pgSequence,
   type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 import { createId } from "../lib/id";
@@ -320,6 +321,9 @@ export const kendaraan = pgTable(
 
 // ───────────────────────── Polis / pengajuan ─────────────────────────
 
+/** Nomor urut kode pengajuan PJ-0001, PJ-0002, … */
+export const polisKodeSeq = pgSequence("polis_kode_seq", { startWith: 1 });
+
 export const polis = pgTable(
   "polis",
   {
@@ -334,6 +338,8 @@ export const polis = pgTable(
       .notNull()
       .references(() => kendaraan.id),
     kategoriId: text().references(() => kategoriPolis.id),
+    /** Asuransi penerbit (dari penawaran yang dipilih) */
+    perusahaanId: text().references(() => perusahaanAsuransi.id),
     salesId: text()
       .notNull()
       .references(() => users.id),
@@ -529,6 +535,8 @@ export const trackerLink = pgTable("tracker_link", {
   dicabut: waktu(),
   jumlahDilihat: integer().notNull().default(0),
   terakhirDilihat: waktu(),
+  /** Salah memasukkan 4 digit WA saat unduh polis; diblokir setelah 5x */
+  gagalUnduh: integer().notNull().default(0),
 });
 
 // ───────────────────────── WhatsApp ─────────────────────────

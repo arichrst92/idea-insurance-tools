@@ -1,0 +1,3 @@
+CREATE SEQUENCE "public"."polis_kode_seq" INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START WITH 1 CACHE 1;--> statement-breakpoint
+ALTER TABLE "polis" ADD COLUMN "perusahaan_id" text;--> statement-breakpoint
+ALTER TABLE "polis" ADD CONSTRAINT "polis_perusahaan_id_perusahaan_asuransi_id_fk" FOREIGN KEY ("perusahaan_id") REFERENCES "public"."perusahaan_asuransi"("id") ON DELETE no action ON UPDATE no action;

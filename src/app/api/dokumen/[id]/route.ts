@@ -1,6 +1,6 @@
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { dokumen, kendaraan, nasabah } from "@/db/schema";
+import { dokumen, kendaraan, nasabah, polis } from "@/db/schema";
 import { sesiSekarang } from "@/lib/auth/session";
 import { bacaFile, tipeKonten } from "@/lib/storage";
 
@@ -20,13 +20,18 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
       const [k] = await db.select({ n: kendaraan.nasabahId }).from(kendaraan).where(eq(kendaraan.id, d.pemilikId));
       nasabahId = k?.n ?? null;
     }
-    const [milik] = nasabahId
+    if (d.pemilikTipe === "polis") {
+      const [p] = await db.select({ n: polis.nasabahId, s: polis.salesId }).from(polis).where(eq(polis.id, d.pemilikId));
+      if (!p || p.s !== s.user.id) return new Response("Tidak ditemukan", { status: 404 });
+      nasabahId = p.n;
+    }
+    const [milik] = nasabahId && d.pemilikTipe !== "polis"
       ? await db
           .select({ id: nasabah.id })
           .from(nasabah)
           .where(and(eq(nasabah.id, nasabahId), eq(nasabah.salesId, s.user.id)))
       : [];
-    if (!milik) return new Response("Tidak ditemukan", { status: 404 });
+    if (!milik && d.pemilikTipe !== "polis") return new Response("Tidak ditemukan", { status: 404 });
   }
 
   const isi = await bacaFile(d.fileKey);

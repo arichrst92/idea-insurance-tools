@@ -1,0 +1,1 @@
+ALTER TABLE "tracker_link" ADD COLUMN "gagal_unduh" integer DEFAULT 0 NOT NULL;

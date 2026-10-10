@@ -2,7 +2,7 @@ import "server-only";
 import { notFound } from "next/navigation";
 import { and, eq, type SQL } from "drizzle-orm";
 import { db } from "@/db";
-import { kendaraan, nasabah, type User } from "@/db/schema";
+import { kendaraan, nasabah, polis, type User } from "@/db/schema";
 
 // Aturan akses data: admin melihat semua; sales hanya nasabah miliknya
 // (dan kendaraan/dokumen/polis dari nasabah itu).
@@ -31,4 +31,15 @@ export async function kendaraanMilik(user: User, id: string) {
     .limit(1);
   if (!baris) notFound();
   return baris;
+}
+
+/** Ambil pengajuan/polis bila boleh diakses user (sales: milik sendiri); 404 bila tidak. */
+export async function polisMilik(user: User, id: string) {
+  const [p] = await db
+    .select()
+    .from(polis)
+    .where(and(eq(polis.id, id), user.role === "admin" ? undefined : eq(polis.salesId, user.id)))
+    .limit(1);
+  if (!p) notFound();
+  return p;
 }

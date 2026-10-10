@@ -20,6 +20,7 @@ import {
   MessageCircle,
   Database,
   UserCog,
+  Sparkles,
   type LucideIcon,
 } from "lucide-react";
 
@@ -37,6 +38,7 @@ const ITEMS: Item[] = [
   { href: "/laporan", label: "Laporan", ikon: BarChart3 },
   { href: "/pencairan", label: "Pencairan", ikon: Wallet },
   { href: "/performa", label: "Performa", ikon: Trophy },
+  { href: "/event", label: "Event", ikon: Sparkles },
   { href: "/panduan", label: "Panduan", ikon: BookOpen },
   { href: "/keuangan", label: "Keuangan", ikon: Landmark, admin: true },
   { href: "/jadwal-bayar", label: "Jadwal bayar", ikon: CalendarDays, admin: true },
