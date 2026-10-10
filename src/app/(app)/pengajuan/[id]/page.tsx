@@ -27,6 +27,7 @@ import { bagiHasilBerlaku } from "@/lib/domain/komisi";
 import { persen, rupiah } from "@/lib/format";
 import { cekKelengkapan, trackerAktif, urlTracker, MIN_FOTO_KENDARAAN } from "@/lib/pengajuan";
 import { PilihPenawaran } from "./pilih-penawaran";
+import { RincianKomisi } from "@/components/rincian-komisi";
 import { FormPenawaran } from "./form-penawaran";
 import {
   ajukan,
@@ -281,6 +282,7 @@ export default async function DetailPengajuan({ params }: { params: Promise<{ id
           }))}
           maksCashback={info.sales.maksCashbackNasabahPersen}
           bagiHasilKantor={bh.persen}
+          bagiHasilKantorNormal={info.sales.bagiHasilKantorPersen}
           namaEvent={namaEvent}
           tambahanEvent={bh.tambahan}
           pilihanNasabahId={p.pilihanNasabahId}
@@ -428,7 +430,17 @@ export default async function DetailPengajuan({ params }: { params: Promise<{ id
       if (s === "cashback_cair" && !p.tglTransferSales)
         panel.push(
           <div key="trfSales" className="rounded-2xl border border-line p-4">
-            <h3 className="mb-3 text-sm font-bold">Transfer komisi ke {info.sales.nama} · {rupiah(p.komisiSalesRp)}</h3>
+            <h3 className="mb-3 text-sm font-bold">Transfer komisi ke {info.sales.nama}</h3>
+            <div className="mb-3 rounded-2xl bg-canvas p-3">
+              <RincianKomisi
+                total={p.komisiSalesRp ?? 0}
+                event={p.komisiEventRp ?? 0}
+                namaEvent={info.ev?.nama}
+                tambahanPersen={info.ev?.tambahanKomisiPersen}
+                porsiSalesNormal={p.bagiHasilKantorNormalPersen != null ? 100 - p.bagiHasilKantorNormalPersen : null}
+                besar={false}
+              />
+            </div>
             <FormAksi aksi={catatTransfer.bind(null, id, "sales")} tombol="Catat transfer komisi" varian="kedua">
               <Isian label="Tanggal transfer" name="tgl" type="date" required defaultValue={hariIni()} className="max-w-[220px]" />
               <InputFile label="Bukti transfer (opsional)" name="bukti" />
@@ -573,11 +585,28 @@ export default async function DetailPengajuan({ params }: { params: Promise<{ id
                 <dd className="text-right">{rupiah(p.cashbackTotalRp)}</dd>
                 <dt className="text-[#A9B0C2]">Ke nasabah ({persen(p.cashbackNasabahPersen)})</dt>
                 <dd className="text-right">{rupiah(p.cashbackNasabahRp)}</dd>
-                <dt className="text-[#A9B0C2]">Bagian kantor ({persen(p.bagiHasilKantorPersen)})</dt>
-                <dd className="text-right">{rupiah(p.bagianKantorRp)}</dd>
-                <dt className="text-[#C9D5FF]">Komisi sales</dt>
-                <dd className="text-right text-lg font-extrabold text-[#8FA8FF]">{rupiah(p.komisiSalesRp)}</dd>
+                {p.bagianKantorRp != null && (
+                  <>
+                    <dt className="text-[#A9B0C2]">
+                      Bagian kantor ({persen(p.bagiHasilKantorPersen)}
+                      {p.komisiEventRp ? `, normal ${persen(p.bagiHasilKantorNormalPersen)}` : ""})
+                    </dt>
+                    <dd className="text-right">{rupiah(p.bagianKantorRp)}</dd>
+                  </>
+                )}
               </dl>
+              {p.komisiSalesRp != null && (
+                <div className="border-t border-[#232A3B] pt-3">
+                  <RincianKomisi
+                    gelap
+                    total={p.komisiSalesRp}
+                    event={p.komisiEventRp ?? 0}
+                    namaEvent={info.ev?.nama}
+                    tambahanPersen={info.ev?.tambahanKomisiPersen}
+                    porsiSalesNormal={p.bagiHasilKantorNormalPersen != null ? 100 - p.bagiHasilKantorNormalPersen : null}
+                  />
+                </div>
+              )}
               {p.noPolis && (
                 <p className="border-t border-[#232A3B] pt-3 text-[13px] text-[#C9D5FF]">
                   Polis {p.noPolis} · {tgl(p.tglMulai)} – {tgl(p.tglAkhir)}

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { FormAksi, type StateForm } from "@/components/form-aksi";
 import { hitungKomisi } from "@/lib/domain/komisi";
 import { rupiah, persen } from "@/lib/format";
+import { RincianKomisi } from "@/components/rincian-komisi";
 
 type Opsi = {
   id: string;
@@ -20,6 +21,7 @@ export function PilihPenawaran({
   opsi,
   maksCashback,
   bagiHasilKantor,
+  bagiHasilKantorNormal,
   namaEvent,
   tambahanEvent,
   pilihanNasabahId,
@@ -28,6 +30,7 @@ export function PilihPenawaran({
   opsi: Opsi[];
   maksCashback: number;
   bagiHasilKantor: number;
+  bagiHasilKantorNormal: number;
   namaEvent: string | null;
   tambahanEvent: number;
   pilihanNasabahId: string | null;
@@ -48,6 +51,7 @@ export function PilihPenawaran({
         cashbackNasabahPersen: cb,
         maksCashbackNasabahPersen: maksCashback,
         bagiHasilKantorPersen: bagiHasilKantor,
+        bagiHasilKantorNormalPersen: bagiHasilKantorNormal,
       });
     } catch (e) {
       galat = (e as Error).message;
@@ -134,9 +138,17 @@ export function PilihPenawaran({
             <dd className="text-right">{rupiah(hasil.cashbackNasabahRp)}</dd>
             <dt className="text-[#A9B0C2]">Bagian kantor</dt>
             <dd className="text-right">{rupiah(hasil.bagianKantorRp)}</dd>
-            <dt className="text-[#C9D5FF]">Komisi sales</dt>
-            <dd className="text-right text-lg font-extrabold text-[#8FA8FF]">{rupiah(hasil.komisiSalesRp)}</dd>
           </dl>
+          <div className="mt-3 border-t border-[#232A3B] pt-3">
+            <RincianKomisi
+              gelap
+              total={hasil.komisiSalesRp}
+              event={hasil.komisiEventRp}
+              namaEvent={namaEvent}
+              tambahanPersen={tambahanEvent}
+              porsiSalesNormal={100 - bagiHasilKantorNormal}
+            />
+          </div>
         </div>
       )}
     </FormAksi>

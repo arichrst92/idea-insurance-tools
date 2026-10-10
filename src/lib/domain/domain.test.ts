@@ -22,7 +22,15 @@ describe("hitungKomisi — contoh di dokumen", () => {
       cashbackSalesRp: 1_200_000,
       bagianKantorRp: 360_000,
       komisiSalesRp: 840_000,
+      komisiDasarRp: 840_000,
+      komisiEventRp: 0,
     });
+  });
+
+  it("event +15% dipisah: dasar 840.000 + event 126.000 = 966.000", () => {
+    expect(
+      hitungKomisi({ ...dasar, bagiHasilKantorPersen: porsiKantorDenganEvent(30, 15), bagiHasilKantorNormalPersen: 30 }),
+    ).toMatchObject({ komisiSalesRp: 966_000, komisiDasarRp: 840_000, komisiEventRp: 126_000 });
   });
 
   it("event +15% komisi: sales 70% → 80,5%, kantor 19,5% → komisi 966.000", () => {

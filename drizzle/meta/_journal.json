@@ -50,6 +50,13 @@
       "when": 1791621574708,
       "tag": "0006_pilihan_nasabah",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1791622287703,
+      "tag": "0007_komisi_event",
+      "breakpoints": true
     }
   ]
 }

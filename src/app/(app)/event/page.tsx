@@ -5,6 +5,7 @@ import { wajibLogin } from "@/lib/auth/session";
 import { FormAksi } from "@/components/form-aksi";
 import { Isian, Kartu, KepalaHalaman, Kosong, Lencana, Pilihan } from "@/components/ui";
 import { persen, rupiah } from "@/lib/format";
+import { RincianKomisi } from "@/components/rincian-komisi";
 import { buatEvent, hapusEvent, ubahAktifEvent, ubahEvent } from "./actions";
 
 export const metadata = { title: "Event bagi hasil" };
@@ -23,6 +24,7 @@ export default async function HalamanEvent() {
         polis: count(polis.id),
         premi: sql<number>`coalesce(sum(${polis.premiBruto}), 0)`.mapWith(Number),
         komisi: sql<number>`coalesce(sum(${polis.komisiSalesRp}), 0)`.mapWith(Number),
+        komisiEvent: sql<number>`coalesce(sum(${polis.komisiEventRp}), 0)`.mapWith(Number),
       })
       .from(eventBagiHasil)
       .leftJoin(polis, and(eq(polis.eventId, eventBagiHasil.id), admin ? undefined : eq(polis.salesId, user.id)))
@@ -59,7 +61,7 @@ export default async function HalamanEvent() {
       <div className={admin ? "grid items-start gap-4 lg:grid-cols-[1.5fr_1fr]" : "flex flex-col gap-4"}>
         <div className="flex flex-col gap-3">
           {terlihat.length === 0 && <Kosong>Belum ada event.</Kosong>}
-          {terlihat.map(({ e, polis: jml, premi, komisi }) => {
+          {terlihat.map(({ e, polis: jml, premi, komisi, komisiEvent }) => {
             const berjalan = e.aktif && e.tglMulai <= hariIni && hariIni <= e.tglSelesai;
             return (
               <Kartu key={e.id} className="flex flex-col gap-3">
@@ -75,7 +77,7 @@ export default async function HalamanEvent() {
                     <span className="rounded-full bg-ink px-3 py-1 text-sm font-extrabold text-white">Komisi sales +{persen(e.tambahanKomisiPersen)}</span>
                   </div>
                 </div>
-                <dl className="grid grid-cols-3 gap-2 text-sm">
+                <dl className="grid grid-cols-2 gap-2 text-sm">
                   <div>
                     <dt className="text-ink-3">Polis</dt>
                     <dd className="text-lg font-bold">{jml}</dd>
@@ -84,11 +86,12 @@ export default async function HalamanEvent() {
                     <dt className="text-ink-3">Premi</dt>
                     <dd className="text-lg font-bold">{rupiah(premi)}</dd>
                   </div>
-                  <div>
-                    <dt className="text-ink-3">Komisi sales</dt>
-                    <dd className="text-lg font-bold">{rupiah(komisi)}</dd>
-                  </div>
                 </dl>
+                {jml > 0 && (
+                  <div className="rounded-2xl bg-canvas p-3">
+                    <RincianKomisi total={komisi} event={komisiEvent} namaEvent={e.nama} tambahanPersen={e.tambahanKomisiPersen} besar={false} />
+                  </div>
+                )}
                 {admin && (
                   <div className="flex flex-wrap items-start gap-x-4 gap-y-2 border-t border-line pt-3">
                     <details className="w-full">

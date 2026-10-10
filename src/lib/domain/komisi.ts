@@ -6,6 +6,8 @@
 //   cashback sales   = cashback total − cashback nasabah
 //   bagian kantor    = cashback sales × % bagi hasil kantor (atau % event)
 //   komisi sales     = cashback sales − bagian kantor
+//   ├ komisi dasar   = cashback sales × % porsi sales normal (tanpa event)
+//   └ tambahan event = komisi sales − komisi dasar
 // Semua nominal dibulatkan ke rupiah terdekat.
 
 export type InputKomisi = {
@@ -13,7 +15,10 @@ export type InputKomisi = {
   cashbackTotalPersen: number;
   cashbackNasabahPersen: number;
   maksCashbackNasabahPersen: number;
+  /** % kantor yang berlaku (sudah termasuk event) */
   bagiHasilKantorPersen: number;
+  /** % kantor normal sales tanpa event; bawaan = bagiHasilKantorPersen (tidak ada event) */
+  bagiHasilKantorNormalPersen?: number;
 };
 
 export type HasilKomisi = {
@@ -22,6 +27,10 @@ export type HasilKomisi = {
   cashbackSalesRp: number;
   bagianKantorRp: number;
   komisiSalesRp: number;
+  /** Komisi yang akan diterima tanpa event */
+  komisiDasarRp: number;
+  /** Tambahan komisi karena event (0 bila tidak ada event) */
+  komisiEventRp: number;
 };
 
 export class KomisiError extends Error {}
@@ -51,8 +60,19 @@ export function hitungKomisi(i: InputKomisi): HasilKomisi {
   const cashbackSalesRp = cashbackTotalRp - cashbackNasabahRp;
   const bagianKantorRp = bulat((cashbackSalesRp * i.bagiHasilKantorPersen) / 100);
   const komisiSalesRp = cashbackSalesRp - bagianKantorRp;
+  const { komisiDasarRp, komisiEventRp } = pecahKomisi(
+    cashbackSalesRp,
+    komisiSalesRp,
+    i.bagiHasilKantorNormalPersen ?? i.bagiHasilKantorPersen,
+  );
 
-  return { cashbackTotalRp, cashbackNasabahRp, cashbackSalesRp, bagianKantorRp, komisiSalesRp };
+  return { cashbackTotalRp, cashbackNasabahRp, cashbackSalesRp, bagianKantorRp, komisiSalesRp, komisiDasarRp, komisiEventRp };
+}
+
+/** Pisahkan komisi sales menjadi bagian normal dan tambahan dari event. */
+export function pecahKomisi(cashbackSalesRp: number, komisiSalesRp: number, kantorNormalPersen: number) {
+  const dasar = Math.min(komisiSalesRp, cashbackSalesRp - bulat((cashbackSalesRp * kantorNormalPersen) / 100));
+  return { komisiDasarRp: dasar, komisiEventRp: komisiSalesRp - dasar };
 }
 
 export type EventAktif = {

@@ -433,6 +433,8 @@ export async function batalkanPersetujuan(id: string, _: StateForm, f: FormData)
         bagiHasilKantorPersen: null,
         bagianKantorRp: null,
         komisiSalesRp: null,
+        bagiHasilKantorNormalPersen: null,
+        komisiEventRp: null,
       })
       .where(eq(polis.id, id));
     await tx.insert(statusHistory).values({ polisId: id, status: "penawaran_masuk", oleh: user.id, catatan: `Persetujuan dibatalkan: ${alasan}` });
@@ -468,6 +470,7 @@ export async function setujuiPenawaran(id: string, _: StateForm, f: FormData): P
       cashbackNasabahPersen: cbNasabah,
       maksCashbackNasabahPersen: s.maksCashbackNasabahPersen,
       bagiHasilKantorPersen: bh.persen,
+      bagiHasilKantorNormalPersen: s.bagiHasilKantorPersen,
     });
     await db.transaction(async (tx) => {
       await tx.update(penawaran).set({ dipilih: false }).where(eq(penawaran.polisId, id));
@@ -493,11 +496,15 @@ export async function setujuiPenawaran(id: string, _: StateForm, f: FormData): P
           bagiHasilKantorPersen: bh.persen,
           bagianKantorRp: k.bagianKantorRp,
           komisiSalesRp: k.komisiSalesRp,
+          bagiHasilKantorNormalPersen: s.bagiHasilKantorPersen,
+          komisiEventRp: k.komisiEventRp,
         },
       });
     });
     segarkan(id);
-    return { ok: `Disetujui. Komisi sales ${rupiah(k.komisiSalesRp)}` };
+    return {
+      ok: `Disetujui. Komisi sales ${rupiah(k.komisiSalesRp)}${k.komisiEventRp > 0 ? ` (dasar ${rupiah(k.komisiDasarRp)} + event ${rupiah(k.komisiEventRp)})` : ""}`,
+    };
   });
 }
 

@@ -369,6 +369,10 @@ export const polis = pgTable(
     bagiHasilKantorPersen: persen(),
     bagianKantorRp: rupiah(),
     komisiSalesRp: rupiah(),
+    /** % kantor normal sales tanpa event (salinan saat disetujui) */
+    bagiHasilKantorNormalPersen: persen(),
+    /** Bagian dari komisiSalesRp yang berasal dari event; komisi dasar = komisiSalesRp − ini */
+    komisiEventRp: rupiah(),
 
     /** Paket yang dipilih nasabah sendiri lewat link tracker (dikonfirmasi sales) */
     pilihanNasabahId: text().references((): AnyPgColumn => penawaran.id, { onDelete: "set null" }),

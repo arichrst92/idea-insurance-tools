@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { FormAksi, type StateForm } from "@/components/form-aksi";
 import { Isian, Pilihan } from "@/components/ui";
-import { hitungKomisi } from "@/lib/domain/komisi";
+import { hitungKomisi, porsiKantorDenganEvent } from "@/lib/domain/komisi";
+import { RincianKomisi } from "@/components/rincian-komisi";
 import { rupiah } from "@/lib/format";
 
 export type DataFormSales = {
@@ -69,6 +70,20 @@ export function FormSales({
     });
   } catch {
     simulasi = null;
+  }
+  // Contoh bila ada event +15% komisi sales.
+  let simEvent: ReturnType<typeof hitungKomisi> | null = null;
+  try {
+    simEvent = hitungKomisi({
+      premiBruto: 6_000_000,
+      cashbackTotalPersen: 35,
+      cashbackNasabahPersen: Math.min(15, maksCb, 35),
+      maksCashbackNasabahPersen: maksCb,
+      bagiHasilKantorPersen: porsiKantorDenganEvent(bagiHasil, 15),
+      bagiHasilKantorNormalPersen: bagiHasil,
+    });
+  } catch {
+    simEvent = null;
   }
 
   return (
@@ -156,6 +171,12 @@ export function FormSales({
                 <dt className="text-[#A9B0C2]">Komisi sales</dt>
                 <dd className="font-extrabold text-[#8FA8FF]">{rupiah(simulasi.komisiSalesRp)}</dd>
               </dl>
+              {simEvent && simEvent.komisiEventRp > 0 && (
+                <div className="mt-3 border-t border-[#232A3B] pt-3">
+                  <p className="mb-2 text-[11px] font-semibold tracking-[0.08em] text-[#A9B0C2]">BILA ADA EVENT +15%</p>
+                  <RincianKomisi gelap besar={false} total={simEvent.komisiSalesRp} event={simEvent.komisiEventRp} tambahanPersen={15} porsiSalesNormal={100 - bagiHasil} />
+                </div>
+              )}
             </div>
           )}
         </fieldset>
