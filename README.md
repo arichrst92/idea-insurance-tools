@@ -57,10 +57,20 @@ Simulasi komisi di form persetujuan dihitung di server (`opsi-penawaran.ts`) dan
 pilihan cashback nasabah. Istilah untuk sales: "Komisi Anda", "Komisi reguler", "Bonus event", "Dana asuransi cair".
 Tes e2e `cekBocor` memastikan istilah/angka tersebut tidak muncul di halaman sales.
 
+## Ekspor PDF
+
+PDF dibuat di background: tombol *Ekspor PDF* → `export_jobs` + antrian BullMQ (Redis) → worker Playwright
+merender halaman cetak `/cetak/<jenis>` (token sekali pakai) menjadi A4 → notifikasi + unduh di *Riwayat ekspor* (7 hari).
+Bila Redis tidak jalan, PDF diproses langsung di proses app.
+
+- Development: `docker compose up -d db redis`, lalu sekali `npx playwright install chromium` (atau isi `PDF_CHROMIUM_PATH`).
+- Production: image Docker sudah memasang Chromium (`PDF_CHROMIUM_PATH=/usr/bin/chromium-browser`).
+
 ## Otomasi & webhook WhatsApp
 
 Otomasi harian berjalan di dalam app (penjadwal per menit, zona WIB) sesuai jadwal di tabel `otomasi_setting`:
-draft perpanjangan 06.00 (H-45) dan remind perpanjangan 09.00 (H-30/H-14/H-7). Bisa juga dipicu manual:
+draft perpanjangan 06.00 (H-45), remind perpanjangan 09.00, alert mandek 08.00, tagih cashback 09.00, rekap komisi Jumat 10.00,
+tutup buku target tanggal 1, laporan berkala 07.00 (Senin & tanggal 1). Atur di menu **Otomasi**, atau picu manual:
 
 ```bash
 curl -X POST -H "Authorization: Bearer $CRON_SECRET" https://insurance.ide.asia/api/cron/remind_perpanjangan
@@ -108,5 +118,5 @@ src/
 - [x] **Sprint 3 — Pengajuan, polis & cashback**: journey 12 status + riwayat (nilai pertanggungan diisi admin dari taksiran asuransi di langkah 3; pembatalan karena salah input oleh sales/admin sebelum polis terbit), cek kelengkapan dokumen, kirim data ke asuransi (email SendGrid + WhatsApp Fonnte ke PIC master), penawaran, persetujuan nasabah + hitung komisi (event otomatis, komisi dasar & tambahan event dipisah), polis terbit + PDF, instruksi bayar dengan PDF terlampir (cadangan wa.me), lunas + bukti, setor/cair/transfer → selesai, revisi/tolak/batal, notifikasi giliran sales, event bagi hasil, daftar polis, link tracker nasabah publik (/t): nasabah memilih paket coverage dari penawaran, upload bukti transfer (dilihat sales/admin untuk ditandai lunas), unduh PDF dengan 4 digit WA
 - [x] **Sprint 4 — Perpanjangan & klaim**: halaman polis akan habis (H-7/14/30/45, lewat masa), remind WhatsApp otomatis H-30/H-14/H-7 + tombol remind manual dengan status pesan (terkirim/diterima/dibaca), draft perpanjangan otomatis H-45, perpanjang dari polis lama (polis lama jadi "diperpanjang" saat perpanjangan terbit), balasan nasabah via webhook Fonnte (YA = setuju perpanjangan, BERHENTI = stop remind, foto = bukti transfer, lainnya diteruskan ke sales), catat klaim + foto + status, ringkasan di dashboard
 - [x] **Sprint 5 — Laporan & pencairan**: dashboard (premi, polis, komisi/cashback, akan habis, klaim, tertunggak, giliran), laporan per periode/sales/asuransi/paket + renewal rate + klaim + ekspor Excel (versi sales tanpa angka asuransi), performa vs target + top 3 + peringkat sales + detail sales (progress, estimasi gaji, riwayat 12 bulan, bulan achieve), pencairan per tahap + lewat termin + rekap komisi siap bayar (CSV), otomasi alert mandek / tagih cashback / rekap komisi / tutup buku target + gaji prorata, notifikasi in-app (lonceng)
-- [ ] Sprint 6 — Keuangan & ekspor PDF
+- [x] **Sprint 6 — Keuangan & ekspor PDF**: input rupiah bertitik; buku kas (entri otomatis dari lunas/setor/cair/transfer/gaji + manual), saldo, dana titipan, saldo bisa ditarik, penarikan + bukti + OTP ulang; jadwal bayar (kalender, CSV KlikBCA sesama/antarbank per batch, tandai dibayar → kas + WA); ekspor PDF di background (BullMQ + Playwright, chart ECharts SSR yang sama di layar & PDF) untuk laporan, keuangan, daftar pengajuan + Excel daftar pengajuan + riwayat ekspor (7 hari); laporan berkala via email; kirim otomatis ke asuransi bawaan; halaman Otomasi (jadwal, parameter, jalankan, log) & WhatsApp (template + pratinjau, log pesan, opt-out)
 - [ ] Sprint 7 — UAT & go-live

@@ -288,3 +288,19 @@ describe("jadwal bayar", () => {
     expect(csvTransfer("antarbank", [{ ...rows[0], kodeBank: "008" }]).split("\r\n")[1]).toBe('5550001111,"Rina, Kartika",008,700000,Komisi Okt 12');
   });
 });
+
+import { cronKeTeks, cronSah } from "./cron-teks";
+
+describe("cron ke teks", () => {
+  it.each([
+    ["0 6 * * *", "Setiap hari 06.00 WIB"],
+    ["0 10 * * 5", "Setiap Jumat 10.00 WIB"],
+    ["30 0 1 * *", "Tanggal 1 setiap bulan, 00.30 WIB"],
+    ["event:data_lengkap", "Saat kejadian, bukan terjadwal"],
+  ])("%s", (a, b) => expect(cronKeTeks(a)).toBe(b));
+  it("validasi", () => {
+    expect(cronSah("0 9 * * 1-5")).toBe(true);
+    expect(cronSah("0 9 * *")).toBe(false);
+    expect(cronSah("0 9 * * x")).toBe(false);
+  });
+});

@@ -10,9 +10,6 @@ import {
   eventBagiHasil,
   kategoriPolis,
   kendaraan,
-  kirimAsuransiLog,
-  kontakAsuransi,
-  nasabah,
   penawaran,
   perusahaanAsuransi,
   polis,
@@ -25,14 +22,14 @@ import {
 import { wajibLogin } from "@/lib/auth/session";
 import { nasabahMilik, polisMilik } from "@/lib/akses";
 import { catatAudit } from "@/lib/audit";
-import { FileTidakValid, bacaFile, simpanFile, tipeKonten } from "@/lib/storage";
+import { FileTidakValid, simpanFile } from "@/lib/storage";
 import { bagiHasilBerlaku, hitungKomisi, KomisiError } from "@/lib/domain/komisi";
 import { labelStatus } from "@/lib/domain/journey";
 import { parsePersen, parseRupiah, rupiah } from "@/lib/format";
-import { escapeHtml, kirimEmail, type Lampiran } from "@/lib/email";
 import { isiTemplate, kirimPesan } from "@/lib/pesan";
 import { buatLinkUnduh } from "@/lib/unduh";
 import { kasOtomatis, transferPolis } from "@/lib/keuangan";
+import { kirimDataKeAsuransi, kirimOtomatisBawaan } from "@/lib/kirim-asuransi";
 import { linkWaMe } from "@/lib/wa";
 import {
   TransisiTidakSah,
@@ -144,7 +141,12 @@ export async function ajukan(id: string): Promise<StateForm> {
         await ubahStatus(tx, { polisId: id, ke: "draft_prospek", oleh: user.id, catatan: "Data diperbaiki" });
       await ubahStatus(tx, { polisId: id, ke: "data_lengkap", oleh: null, catatan: "Dokumen lengkap, siap dikirim ke asuransi" });
     });
+    const otomatis = await kirimOtomatisBawaan(id).catch((e) => {
+      console.error("[kirim otomatis]", e);
+      return null;
+    });
     segarkan(id);
+    if (otomatis?.adaTerkirim) return { ok: `Data lengkap dan langsung dikirim ke asuransi bawaan: ${otomatis.hasilKirim.join(" · ")}` };
     return { ok: "Pengajuan siap dikirim admin ke asuransi" };
   });
 }
@@ -161,112 +163,7 @@ export async function kirimKeAsuransi(id: string, _: StateForm, f: FormData): Pr
   if (perusahaanIds.length === 0) return { error: "Pilih minimal satu asuransi" };
   if (kanal.length === 0) return { error: "Pilih kanal: email dan/atau WhatsApp" };
 
-  const [b] = await db
-    .select({ n: nasabah, k: kendaraan })
-    .from(polis)
-    .innerJoin(nasabah, eq(nasabah.id, polis.nasabahId))
-    .innerJoin(kendaraan, eq(kendaraan.id, polis.kendaraanId))
-    .where(eq(polis.id, id));
-  const docs = await db
-    .select()
-    .from(dokumen)
-    .where(
-      sql`(${dokumen.pemilikTipe} = 'nasabah' and ${dokumen.pemilikId} = ${p.nasabahId})
-       or (${dokumen.pemilikTipe} = 'kendaraan' and ${dokumen.pemilikId} = ${p.kendaraanId})`,
-    );
-
-  const baris: [string, string][] = [
-    ["Nama tertanggung", b.n.nama],
-    ["NIK", b.n.nik ?? "-"],
-    ["Alamat", b.n.alamat ?? "-"],
-    ["Kendaraan", `${b.k.merek} ${b.k.model} (${b.k.tahun})`],
-    ["No. polisi", b.k.noPolisi],
-    ["Warna", b.k.warna ?? "-"],
-    ["No. rangka", b.k.noRangka ?? "-"],
-    ["No. mesin", b.k.noMesin ?? "-"],
-    ["Permintaan", "Mohon taksiran nilai pertanggungan (TSI) dan penawaran untuk semua paket yang tersedia (mis. Biasa, Plus, Complete)"],
-  ];
-  const teksData = baris.map(([k, v]) => `${k}: ${v}`).join("\n");
-  const htmlData = `<table cellpadding="6" style="border-collapse:collapse;font-family:Arial,sans-serif;font-size:14px">${baris
-    .map(([k, v]) => `<tr><td style="color:#6b7280">${escapeHtml(k)}</td><td><b>${escapeHtml(v)}</b></td></tr>`)
-    .join("")}</table>`;
-
-  let lampiranEmail: Lampiran[] | null = null;
-  const lampiranNama = docs.map((d) => d.namaFile ?? d.jenis);
-  const hasilKirim: string[] = [];
-  let adaTerkirim = false;
-  // wa.me cadangan hanya bisa membuka satu chat; sisanya tercatat di riwayat kirim.
-  let bukaUrl: string | undefined;
-
-  for (const pid of perusahaanIds) {
-    const [a] = await db.select().from(perusahaanAsuransi).where(eq(perusahaanAsuransi.id, pid));
-    if (!a) continue;
-    const kontak = await db
-      .select()
-      .from(kontakAsuransi)
-      .where(eq(kontakAsuransi.perusahaanId, pid))
-      .orderBy(desc(kontakAsuransi.utama));
-    const subjek = `Permohonan penawaran asuransi mobil ${b.k.noPolisi} — ${p.kode}`;
-
-    if (kanal.includes("email")) {
-      const k = kontak.find((x) => x.email);
-      if (!k) hasilKirim.push(`${a.nama}: email PIC belum ada`);
-      else {
-        lampiranEmail ??= await Promise.all(
-          docs.map(async (d) => ({ namaFile: d.namaFile ?? `${d.jenis}.${d.fileKey.split(".").pop()}`, tipe: tipeKonten(d.fileKey), isi: await bacaFile(d.fileKey) })),
-        );
-        const r = await kirimEmail({
-          ke: k.email!,
-          subjek,
-          balasKe: user.email ?? undefined,
-          teks: `Yth. ${k.namaPic},\n\nMohon penawaran asuransi mobil dengan data berikut:\n\n${teksData}\n\nTerlampir KTP, STNK, dan foto kendaraan.\n\nTerima kasih,\n${user.nama}`,
-          html: `<p>Yth. ${escapeHtml(k.namaPic)},</p><p>Mohon penawaran asuransi mobil dengan data berikut:</p>${htmlData}<p>Terlampir KTP, STNK, dan foto kendaraan.</p><p>Terima kasih,<br>${escapeHtml(user.nama)}</p>`,
-          lampiran: lampiranEmail,
-        });
-        await db.insert(kirimAsuransiLog).values({
-          polisId: id,
-          perusahaanId: pid,
-          kontakId: k.id,
-          kanal: "email",
-          tujuan: k.email!,
-          lampiran: lampiranNama,
-          hasil: r.ok ? "terkirim" : "gagal",
-          oleh: user.id,
-        });
-        hasilKirim.push(`${a.nama} email: ${r.ok ? "terkirim" : `gagal (${r.alasan})`}`);
-        adaTerkirim ||= r.ok;
-      }
-    }
-
-    if (kanal.includes("wa")) {
-      const k = kontak.find((x) => x.noWa);
-      if (!k) hasilKirim.push(`${a.nama}: WhatsApp PIC belum ada`);
-      else {
-        const links = await Promise.all(docs.map(async (d) => `- ${d.jenis.replace("_", " ")}: ${await buatLinkUnduh(d.id, 30)}`));
-        const isi = `Yth. ${k.namaPic} (${a.nama}),\nMohon penawaran asuransi mobil — ${p.kode}\n\n${teksData}\n\nDokumen:\n${links.join("\n")}\n\nTerima kasih,\n${user.nama}`;
-        const r = await kirimPesan({ ke: k.noWa!, isi, jenis: "kirim_asuransi", polisId: id, userId: user.id });
-        await db.insert(kirimAsuransiLog).values({
-          polisId: id,
-          perusahaanId: pid,
-          kontakId: k.id,
-          kanal: "wa",
-          tujuan: k.noWa!,
-          lampiran: lampiranNama,
-          hasil: r.kanal === "fonnte" ? "terkirim" : "dibuka_wa",
-          oleh: user.id,
-        });
-        hasilKirim.push(`${a.nama} WhatsApp: ${r.kanal === "fonnte" ? "terkirim" : "buka WhatsApp untuk mengirim"}`);
-        adaTerkirim = true;
-        if (r.kanal === "wame") bukaUrl ??= r.url;
-      }
-    }
-  }
-
-  if (adaTerkirim && p.statusPengajuan === "data_lengkap") {
-    await db.transaction((tx) =>
-      ubahStatus(tx, { polisId: id, ke: "dikirim_ke_asuransi", oleh: user.id, catatan: hasilKirim.join("; ") }),
-    );
-  }
+  const { adaTerkirim, hasilKirim, bukaUrl } = await kirimDataKeAsuransi(id, { perusahaanIds, kanal, pengirim: { id: user.id, nama: user.nama, email: user.email } });
   segarkan(id);
   return adaTerkirim
     ? { ok: hasilKirim.join(" · "), bukaUrl }

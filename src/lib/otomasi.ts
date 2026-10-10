@@ -1,13 +1,14 @@
 import "server-only";
 import { and, eq, gte } from "drizzle-orm";
 import { db } from "@/db";
-import { otomasiLog, otomasiSetting } from "@/db/schema";
+import { notifikasi, otomasiLog, otomasiSetting, users } from "@/db/schema";
 import { cocokCron, waktuWib } from "@/lib/domain/perpanjangan";
 import { jobDraftPerpanjangan, jobRemindPerpanjangan } from "@/lib/perpanjangan";
-import { jobAlertMandek, jobRekapKomisi, jobTagihCashback, jobTutupBukuTarget } from "@/lib/otomasi-jobs";
+import { jobAlertMandek, jobLaporanBerkala, jobRekapKomisi, jobTagihCashback, jobTutupBukuTarget } from "@/lib/otomasi-jobs";
 
 type Hasil = { jumlah: number; ringkasan: string };
-type Job = (param: Record<string, unknown>) => Promise<Hasil>;
+type Opsi = { paksa?: boolean; penerima?: string[] };
+type Job = (param: Record<string, unknown>, opsi: Opsi) => Promise<Hasil>;
 
 /** Otomasi yang sudah dibangun. Laporan berkala & kirim otomatis ke asuransi menyusul di Sprint 6. */
 export const JOB: Record<string, Job> = {
@@ -17,6 +18,7 @@ export const JOB: Record<string, Job> = {
   tagih_cashback: (p) => jobTagihCashback(p as { jedaHari?: number }),
   rekap_komisi: () => jobRekapKomisi(),
   tutup_buku_target: () => jobTutupBukuTarget(),
+  laporan_berkala: (p, o) => jobLaporanBerkala(p as { mingguan?: boolean; bulanan?: boolean }, o),
 };
 
 /** Jalankan satu otomasi dan catat hasilnya di otomasi_log. */
@@ -29,7 +31,7 @@ export async function jalankanOtomasi(kode: string, opsi: { paksa?: boolean } = 
 
   const [log] = await db.insert(otomasiLog).values({ kode }).returning({ id: otomasiLog.id });
   try {
-    const h = await job((s.parameter as Record<string, unknown>) ?? {});
+    const h = await job((s.parameter as Record<string, unknown>) ?? {}, { paksa: opsi.paksa, penerima: s.penerima });
     await db
       .update(otomasiLog)
       .set({ selesai: new Date(), status: "sukses", jumlahDiproses: h.jumlah, ringkasan: h.ringkasan })
@@ -39,6 +41,10 @@ export async function jalankanOtomasi(kode: string, opsi: { paksa?: boolean } = 
     const pesan = e instanceof Error ? e.message : String(e);
     await db.update(otomasiLog).set({ selesai: new Date(), status: "gagal", error: pesan }).where(eq(otomasiLog.id, log.id));
     console.error(`[otomasi:${kode}]`, e);
+    // Kabari admin bahwa otomasi gagal.
+    const admins = await db.select({ id: users.id }).from(users).where(and(eq(users.role, "admin"), eq(users.aktif, true)));
+    if (admins.length)
+      await db.insert(notifikasi).values(admins.map((a) => ({ userId: a.id, jenis: "otomasi_gagal", judul: `Otomasi gagal: ${s.nama}`, isi: pesan.slice(0, 300), link: "/otomasi" })));
     return { ok: false as const, pesan };
   }
 }

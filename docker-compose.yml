@@ -44,12 +44,14 @@ services:
       DATABASE_URL: postgresql://insurance:${POSTGRES_PASSWORD:-insurance}@db:5432/insurance
       REDIS_URL: redis://redis:6379
       STORAGE_DIR: /data/storage
+      INTERNAL_URL: http://127.0.0.1:3000 # worker PDF membuka halaman cetak di container yang sama
     volumes:
       - storage:/data/storage # file upload; ikut di-backup
     ports:
       - "127.0.0.1:3000:3000" # Nginx di host meneruskan insurance.ide.asia → :3000
     depends_on:
       migrate: { condition: service_completed_successfully }
+      redis: { condition: service_started }
 
 volumes:
   pgdata:

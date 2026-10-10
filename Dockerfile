@@ -20,7 +20,9 @@ CMD ["npx", "drizzle-kit", "migrate"]
 
 FROM node:22-alpine AS runner
 WORKDIR /app
-ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3000 HOSTNAME=0.0.0.0
+# Chromium + font untuk worker ekspor PDF (Playwright)
+RUN apk add --no-cache chromium nss freetype harfbuzz ttf-freefont font-noto
+ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3000 HOSTNAME=0.0.0.0 PDF_CHROMIUM_PATH=/usr/bin/chromium-browser
 RUN addgroup -S app && adduser -S app -G app && mkdir -p /data/storage && chown app:app /data/storage
 COPY --from=builder --chown=app:app /app/.next/standalone ./
 COPY --from=builder --chown=app:app /app/.next/static ./.next/static

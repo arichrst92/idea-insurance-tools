@@ -16,6 +16,7 @@ export const TIPE_DIIZINKAN: Record<string, string> = {
   "image/webp": "webp",
   "image/heic": "heic",
   "application/pdf": "pdf",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
 };
 
 export function folderStorage(): string {

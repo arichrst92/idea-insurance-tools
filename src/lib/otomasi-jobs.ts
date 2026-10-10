@@ -1,7 +1,8 @@
 import "server-only";
 import { and, eq, gte, isNotNull, isNull, notInArray, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { kendaraan, kirimAsuransiLog, kontakAsuransi, nasabah, notifikasi, perusahaanAsuransi, polis, targetSales, users, type StatusPengajuan } from "@/db/schema";
+import { exportJobs, kendaraan, kirimAsuransiLog, kontakAsuransi, nasabah, notifikasi, perusahaanAsuransi, polis, targetSales, users, type StatusPengajuan } from "@/db/schema";
+import { simpanFile } from "@/lib/storage";
 import { STATUS_DITUTUP, labelStatus } from "@/lib/domain/journey";
 import { sisaHari, waktuWib } from "@/lib/domain/perpanjangan";
 import { awalBulan, geserBulan, namaBulanId } from "@/lib/domain/periode";
@@ -200,3 +201,58 @@ export async function jobTutupBukuTarget() {
       await db.insert(notifikasi).values({ userId: a.id, jenis: "tutup_buku", judul: `Tutup buku target ${namaBulanId(bulanLalu)}`, isi: hasil.join("; "), link: "/performa?periode=bulan_lalu" });
   return { jumlah: daftar.length, ringkasan: daftar.length ? hasil.join("; ") : `Tidak ada target ${namaBulanId(bulanLalu)} yang perlu ditutup` };
 }
+
+/**
+ * Harian 07.00, berjalan pada hari Senin (laporan minggu lalu) dan tanggal 1 (laporan bulan lalu):
+ * PDF laporan penjualan & keuangan dikirim via email ke penerima yang diatur admin.
+ */
+export async function jobLaporanBerkala(param: { mingguan?: boolean; bulanan?: boolean }, opsi: { paksa?: boolean; penerima?: string[] } = {}) {
+  const w = waktuWib();
+  const periodeList: { nama: string; dari: string; sampai: string }[] = [];
+  if ((w.hariMinggu === 1 && param.mingguan !== false) || opsi.paksa) {
+    const senin = tambahHariTgl(w.tanggal, -7);
+    periodeList.push({ nama: "Mingguan", dari: senin, sampai: tambahHariTgl(senin, 6) });
+  }
+  if (w.tgl === 1 && param.bulanan !== false) {
+    const bulanLalu = geserBulan(awalBulan(w.tanggal), -1);
+    periodeList.push({ nama: `Bulanan ${namaBulanId(bulanLalu)}`, dari: bulanLalu, sampai: tambahHariTgl(awalBulan(w.tanggal), -1) });
+  }
+  if (periodeList.length === 0) return { jumlah: 0, ringkasan: "Hari ini bukan jadwal laporan (Senin / tanggal 1)" };
+
+  const [admin] = await db.select().from(users).where(and(eq(users.role, "admin"), eq(users.aktif, true))).limit(1);
+  if (!admin) return { jumlah: 0, ringkasan: "Tidak ada admin aktif" };
+  const penerima = opsi.penerima?.length
+    ? opsi.penerima
+    : (await db.select({ e: users.email }).from(users).where(and(eq(users.role, "admin"), eq(users.aktif, true)))).map((x) => x.e).filter((x): x is string => !!x);
+  if (penerima.length === 0) return { jumlah: 0, ringkasan: "Penerima laporan belum diatur (isi di halaman Otomasi atau email admin)" };
+
+  const { renderPdf } = await import("@/lib/ekspor/antrian");
+  let jumlah = 0;
+  for (const p of periodeList) {
+    const lampiran = [];
+    for (const jenis of ["laporan", "keuangan"] as const) {
+      const [job] = await db
+        .insert(exportJobs)
+        .values({ userId: admin.id, jenisLaporan: jenis, filter: { periode: "kustom", dari: p.dari, sampai: p.sampai }, format: "pdf", status: "proses" })
+        .returning({ id: exportJobs.id });
+      const pdf = await renderPdf(job.id, jenis);
+      const key = await simpanFile(new File([new Uint8Array(pdf)], `${jenis}.pdf`, { type: "application/pdf" }), "ekspor");
+      await db.update(exportJobs).set({ status: "selesai", fileKey: key, selesai: new Date() }).where(eq(exportJobs.id, job.id));
+      lampiran.push({ namaFile: `${jenis === "laporan" ? "laporan-penjualan" : "laporan-keuangan"}_${p.dari}_${p.sampai}.pdf`, tipe: "application/pdf", isi: pdf });
+    }
+    const subjek = `Laporan ${p.nama} Rekap Asuransi (${p.dari} s/d ${p.sampai})`;
+    for (const ke of penerima) {
+      const h = await kirimEmail({
+        ke,
+        subjek,
+        teks: `Terlampir laporan penjualan dan keuangan periode ${p.dari} s/d ${p.sampai}.`,
+        html: `<p>Terlampir laporan penjualan dan keuangan periode <b>${p.dari} s/d ${p.sampai}</b>.</p>`,
+        lampiran,
+      });
+      if (h.ok) jumlah++;
+    }
+  }
+  return { jumlah, ringkasan: `${periodeList.map((p) => p.nama).join(" + ")} terkirim ke ${penerima.join(", ")}` };
+}
+
+const tambahHariTgl = (t: string, n: number) => new Date(Date.parse(t + "T00:00:00Z") + n * 86_400_000).toISOString().slice(0, 10);

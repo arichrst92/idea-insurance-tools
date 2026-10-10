@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Dimuat apa adanya dari node_modules (worker PDF & antrian), tidak dibundel.
+  serverExternalPackages: ["playwright-core", "bullmq", "ioredis", "echarts"],
   // Image Docker kecil: hanya server mandiri + file yang dipakai.
   output: "standalone",
   poweredByHeader: false,

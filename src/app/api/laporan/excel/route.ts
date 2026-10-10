@@ -2,6 +2,7 @@ import ExcelJS from "exceljs";
 import { sesiSekarang } from "@/lib/auth/session";
 import { agregasi, polisTerbit, renewal, ringkasKlaim, total, type Agregat } from "@/lib/laporan";
 import { filterDari, type SP } from "@/app/(app)/laporan/util";
+import { catatEksporExcel } from "@/lib/ekspor/simpan";
 
 // Ekspor laporan ke Excel dengan filter yang sama seperti halaman Laporan.
 // Kolom cashback asuransi & bagian kantor hanya untuk admin.
@@ -92,6 +93,7 @@ export async function GET(req: Request) {
 
   const buf = await wb.xlsx.writeBuffer();
   const nama = `laporan-${p.dari}_${p.sampai}.xlsx`;
+  await catatEksporExcel({ userId: user.id, jenis: "laporan", filter: sp as Record<string, string>, isi: buf as ArrayBuffer, nama });
   return new Response(new Uint8Array(buf as ArrayBuffer), {
     headers: {
       "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

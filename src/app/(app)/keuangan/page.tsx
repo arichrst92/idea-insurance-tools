@@ -13,6 +13,9 @@ import { filterDari, type SP } from "../laporan/util";
 import { geserBulan, namaBulanId } from "@/lib/domain/periode";
 import { waktuWib } from "@/lib/domain/perpanjangan";
 import { rupiah } from "@/lib/format";
+import { TombolPdf } from "@/components/tombol-ekspor";
+import { ChartSvg } from "@/components/chart-svg";
+import { svgBar, WARNA } from "@/lib/chart";
 import { entriManual, hapusEntri, tarikDana } from "./actions";
 
 export const metadata = { title: "Keuangan" };
@@ -43,7 +46,16 @@ export default async function HalamanKeuangan({ searchParams }: { searchParams: 
   ]);
   const masuk = mutasi.filter((m) => m.k.arah === "masuk").reduce((a, m) => a + m.k.nominal, 0);
   const keluar = mutasi.filter((m) => m.k.arah === "keluar").reduce((a, m) => a + m.k.nominal, 0);
-  const maksArus = Math.max(1, ...arus.flatMap((a) => [a.masuk, a.keluar]));
+  const bulan6 = Array.from({ length: 6 }, (_, i) => geserBulan(awal6, i).slice(0, 7));
+  const svgArus = svgBar({
+    kategori: bulan6.map((b) => namaBulanId(b + "-01").slice(0, 3)),
+    seri: [
+      { nama: "Masuk", data: bulan6.map((b) => arus.find((x) => x.bulan === b)?.masuk ?? 0), warna: WARNA.ok },
+      { nama: "Keluar", data: bulan6.map((b) => arus.find((x) => x.bulan === b)?.keluar ?? 0), warna: WARNA.bad },
+    ],
+    lebar: 760,
+    tinggi: 240,
+  });
   const perluOtp = perluVerifikasiUlang(sesi);
   const manual = (Object.keys(KATEGORI_KAS) as KategoriKas[]).filter((k) => !KATEGORI_KAS[k].otomatis && k !== "penarikan");
 
@@ -54,6 +66,7 @@ export default async function HalamanKeuangan({ searchParams }: { searchParams: 
         judul="Buku kas"
         sorot="kantor"
         sub="Premi masuk, setor premi, dana asuransi, transfer cashback & komisi, dan gaji tercatat otomatis. Entri lain diinput manual."
+        aksi={<TombolPdf jenis="keuangan" filter={{ periode: sp.periode, dari: sp.dari, sampai: sp.sampai }} />}
       />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4" data-uji="posisi-kas">
@@ -71,30 +84,8 @@ export default async function HalamanKeuangan({ searchParams }: { searchParams: 
       <Kartu className="flex flex-col gap-3" data-uji="arus-kas">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h2 className="text-base font-bold">Arus kas 6 bulan</h2>
-          <span className="flex gap-3 text-[12px] text-ink-3">
-            <span className="flex items-center gap-1.5">
-              <span className="size-2.5 rounded-sm bg-ok" /> Masuk
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="size-2.5 rounded-sm bg-bad" /> Keluar
-            </span>
-          </span>
         </div>
-        {arus.length === 0 ? (
-          <p className="text-sm text-ink-3">Belum ada mutasi.</p>
-        ) : (
-          <div className="flex h-44 items-end gap-3 overflow-x-auto pt-2">
-            {arus.map((a) => (
-              <div key={a.bulan} className="flex min-w-16 flex-1 flex-col items-center gap-1.5">
-                <div className="flex h-32 w-full items-end justify-center gap-1">
-                  <div className="w-1/3 max-w-6 rounded-t bg-ok" style={{ height: `${(a.masuk / maksArus) * 100}%` }} title={`Masuk ${rupiah(a.masuk)}`} />
-                  <div className="w-1/3 max-w-6 rounded-t bg-bad" style={{ height: `${(a.keluar / maksArus) * 100}%` }} title={`Keluar ${rupiah(a.keluar)}`} />
-                </div>
-                <span className="text-[11px] font-semibold text-ink-3">{namaBulanId(a.bulan + "-01").slice(0, 3)}</span>
-              </div>
-            ))}
-          </div>
-        )}
+        <ChartSvg svg={svgArus} label="Chart arus kas masuk dan keluar per bulan" />
       </Kartu>
 
       <div className="grid items-start gap-4 lg:grid-cols-[1.6fr_1fr]">

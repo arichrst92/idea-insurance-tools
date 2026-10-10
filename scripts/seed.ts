@@ -73,10 +73,10 @@ const OTOMASI = [
   { kode: "alert_mandek", nama: "Alert pengajuan mandek", jadwalCron: "0 8 * * *", parameter: { hari: 3, hariCepat: 2, eskalasiAdmin: 7 } },
   { kode: "tagih_cashback", nama: "Pengingat penagihan cashback", jadwalCron: "0 9 * * *", parameter: { jedaHari: 7 } },
   { kode: "rekap_komisi", nama: "Rekap komisi siap bayar", jadwalCron: "0 10 * * 5", parameter: {} },
-  { kode: "laporan_berkala", nama: "Laporan berkala", jadwalCron: "0 7 * * 1", parameter: { bulanan: true } },
+  { kode: "laporan_berkala", nama: "Laporan berkala", jadwalCron: "0 7 * * *", parameter: { mingguan: true, bulanan: true } },
   { kode: "tutup_buku_target", nama: "Tutup buku target", jadwalCron: "30 0 1 * *", parameter: {} },
   { kode: "jadwal_bayar", nama: "Aturan jadwal bayar", jadwalCron: "event:pengaturan", parameter: { hariKerjaCashback: 3, hariBayarKomisi: 5, tglGajian: 1 } },
-  { kode: "kirim_otomatis_asuransi", nama: "Kirim otomatis ke asuransi", jadwalCron: "event:data_lengkap", parameter: {}, aktif: false },
+  { kode: "kirim_otomatis_asuransi", nama: "Kirim otomatis ke asuransi", jadwalCron: "event:data_lengkap", parameter: { perusahaanIds: [], kanal: ["email", "wa"] }, aktif: false },
 ];
 
 async function main() {

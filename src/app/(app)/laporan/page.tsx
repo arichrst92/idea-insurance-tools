@@ -1,9 +1,13 @@
 import { wajibLogin } from "@/lib/auth/session";
-import { KepalaHalaman } from "@/components/ui";
+import { Kartu, KepalaHalaman } from "@/components/ui";
 import { Angka, FilterPeriode, TabelBar, type Kolom } from "@/components/laporan";
 import { filterDari, rasio, type SP } from "./util";
 import { agregasi, pilihanFilter, polisTerbit, renewal, ringkasKlaim, total, type Agregat } from "@/lib/laporan";
 import { angka, persen, rupiah } from "@/lib/format";
+import { TombolPdf } from "@/components/tombol-ekspor";
+import { ChartSvg } from "@/components/chart-svg";
+import { svgBar, WARNA } from "@/lib/chart";
+import { geserBulan, namaBulanId } from "@/lib/domain/periode";
 
 export const metadata = { title: "Laporan" };
 
@@ -14,7 +18,23 @@ export default async function HalamanLaporan({ searchParams }: { searchParams: P
   const sp = await searchParams;
   const { p, f } = filterDari(sp);
 
-  const [rows, ren, kl, pilihan] = await Promise.all([polisTerbit(user, f), renewal(user, f), ringkasKlaim(user, f), pilihanFilter(admin)]);
+  const awal6 = geserBulan(f.sampai.slice(0, 8) + "01", -5);
+  const [rows, rows6, ren, kl, pilihan] = await Promise.all([
+    polisTerbit(user, f),
+    polisTerbit(user, { ...f, dari: awal6 < f.dari ? awal6 : f.dari }),
+    renewal(user, f),
+    ringkasKlaim(user, f),
+    pilihanFilter(admin),
+  ]);
+  const bulan6 = Array.from({ length: 6 }, (_, i) => geserBulan(awal6, i));
+  const premi6 = agregasi(rows6, (r) => [r.tglTerbit.slice(0, 7), r.tglTerbit.slice(0, 7)], admin);
+  const svgPremi = svgBar({
+    kategori: bulan6.map((b) => namaBulanId(b).slice(0, 3)),
+    seri: [{ nama: "Premi", data: bulan6.map((b) => premi6.find((x) => x.kunci === b.slice(0, 7))?.premi ?? 0), warna: WARNA.brand }],
+    lebar: 760,
+    tinggi: 240,
+    label: true,
+  });
   const t = total(rows, admin);
   const perSales = agregasi(rows, (r) => [r.salesId, r.sales], admin);
   const perAsuransi = agregasi(rows, (r) => [r.asuransi, r.asuransi], admin);
@@ -42,9 +62,12 @@ export default async function HalamanLaporan({ searchParams }: { searchParams: P
         sorot={admin ? "penjualan" : "saya"}
         sub="Penjualan dihitung pada tanggal polis terbit. Pengajuan batal atau salah input tidak terhitung."
         aksi={
-          <a href={`/api/laporan/excel?${qs}`} className="inline-flex h-10 items-center rounded-full border border-line-2 bg-white px-5 text-sm font-semibold hover:border-ink-4">
-            Ekspor Excel
-          </a>
+          <>
+            <a href={`/api/laporan/excel?${qs}`} download className="inline-flex h-10 items-center rounded-full border border-line-2 bg-white px-5 text-sm font-semibold hover:border-ink-4">
+              Ekspor Excel
+            </a>
+            <TombolPdf jenis="laporan" filter={{ ...sp }} />
+          </>
         }
       />
       <FilterPeriode aksi="/laporan" p={p} nilai={sp} pilihan={pilihan} />
@@ -70,6 +93,10 @@ export default async function HalamanLaporan({ searchParams }: { searchParams: P
         <Angka label="Lunas" nilai={persen(rasio(rows.filter((r) => r.lunas).length, rows.length))} sub={`${rows.filter((r) => !r.lunas).length} polis belum dibayar`} />
       </div>
 
+      <Kartu className="flex flex-col gap-2" data-uji="chart-premi">
+        <h2 className="text-base font-bold">Premi per bulan · 6 bulan s/d {namaBulanId(f.sampai)}</h2>
+        <ChartSvg svg={svgPremi} label="Chart premi per bulan" />
+      </Kartu>
       {perBulan.length > 1 && <TabelBar judul="Per bulan" baris={perBulan} kolom={kolom} bar={bar((r) => r.label)} uji="per-bulan" />}
       {admin && <TabelBar judul="Per sales" baris={perSales} kolom={kolom} bar={bar((r) => r.label)} uji="per-sales" />}
       <div className="grid gap-4 xl:grid-cols-2">

@@ -8,6 +8,7 @@ import { Kartu, KepalaHalaman, Kosong, TautanTombol } from "@/components/ui";
 import { BarJourney, LencanaStatus } from "@/components/journey";
 import { LANGKAH, nomorLangkah } from "@/lib/domain/journey";
 import { rupiah } from "@/lib/format";
+import { TombolPdf } from "@/components/tombol-ekspor";
 
 export const metadata = { title: "Pengajuan" };
 
@@ -111,7 +112,19 @@ export default async function DaftarPengajuan({
         judul={admin ? "Semua" : "Pengajuan"}
         sorot={admin ? "pengajuan" : "saya"}
         sub="Status journey 12 langkah dari input calon konsumen sampai komisi dibayar."
-        aksi={<TautanTombol href="/pengajuan/baru">Pengajuan baru</TautanTombol>}
+        aksi={
+          <>
+            <a
+              href={`/api/pengajuan/excel?${new URLSearchParams({ tab, ...(q ? { q } : {}), ...(sp.sales ? { sales: sp.sales } : {}) })}`}
+              download
+              className="inline-flex h-10 items-center rounded-full border border-line-2 bg-white px-5 text-sm font-semibold hover:border-ink-4"
+            >
+              Ekspor Excel
+            </a>
+            <TombolPdf jenis="pengajuan" filter={{ tab, q, sales: sp.sales }} />
+            <TautanTombol href="/pengajuan/baru">Pengajuan baru</TautanTombol>
+          </>
+        }
       />
 
       <nav aria-label="Filter status" className="-mt-2 overflow-x-auto">
