@@ -59,21 +59,33 @@ export type EventAktif = {
   id: string;
   tglMulai: string; // YYYY-MM-DD
   tglSelesai: string;
-  bagiHasilKantorPersen: number;
+  /** Tambahan porsi sales, relatif terhadap porsi normalnya (mis. 15 → porsi sales × 1,15). */
+  tambahanKomisiPersen: number;
   berlakuUntuk: "semua" | "fulltime" | "freelance" | "pilihan";
   salesIds: string[];
   aktif: boolean;
 };
 
 /**
+ * Porsi kantor setelah event. Event bersifat tambahan untuk sales:
+ *   porsi sales  = (100 − % kantor normal) × (1 + tambahan/100), maks 100
+ *   porsi kantor = 100 − porsi sales
+ * Contoh: kantor 60 / sales 40, event +15% → sales 46, kantor 54.
+ */
+export function porsiKantorDenganEvent(kantorNormal: number, tambahanPersen: number): number {
+  const sales = Math.min(100, (100 - kantorNormal) * (1 + tambahanPersen / 100));
+  return Math.round((100 - sales) * 100) / 100;
+}
+
+/**
  * % bagi hasil kantor yang berlaku untuk polis yang diinput pada `tanggal`.
- * Event menggantikan % normal; bila beberapa event tumpang tindih, dipakai % terendah.
+ * Bila beberapa event berlaku bersamaan, dipakai tambahan terbesar (tidak dijumlahkan).
  */
 export function bagiHasilBerlaku(
   sales: { id: string; tipeSales: "fulltime" | "freelance" | null; bagiHasilKantorPersen: number },
   tanggal: string,
   events: EventAktif[],
-): { persen: number; eventId: string | null } {
+): { persen: number; eventId: string | null; tambahan: number } {
   const cocok = events.filter(
     (e) =>
       e.aktif &&
@@ -83,7 +95,11 @@ export function bagiHasilBerlaku(
         (e.berlakuUntuk === "pilihan" && e.salesIds.includes(sales.id)) ||
         (sales.tipeSales !== null && e.berlakuUntuk === sales.tipeSales)),
   );
-  if (cocok.length === 0) return { persen: sales.bagiHasilKantorPersen, eventId: null };
-  const terendah = cocok.reduce((a, b) => (b.bagiHasilKantorPersen < a.bagiHasilKantorPersen ? b : a));
-  return { persen: terendah.bagiHasilKantorPersen, eventId: terendah.id };
+  if (cocok.length === 0) return { persen: sales.bagiHasilKantorPersen, eventId: null, tambahan: 0 };
+  const terbesar = cocok.reduce((a, b) => (b.tambahanKomisiPersen > a.tambahanKomisiPersen ? b : a));
+  return {
+    persen: porsiKantorDenganEvent(sales.bagiHasilKantorPersen, terbesar.tambahanKomisiPersen),
+    eventId: terbesar.id,
+    tambahan: terbesar.tambahanKomisiPersen,
+  };
 }

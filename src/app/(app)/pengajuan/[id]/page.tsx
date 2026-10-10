@@ -300,6 +300,7 @@ export default async function DetailPengajuan({ params }: { params: Promise<{ id
           maksCashback={info.sales.maksCashbackNasabahPersen}
           bagiHasilKantor={bh.persen}
           namaEvent={namaEvent}
+          tambahanEvent={bh.tambahan}
         />
       </div>,
     );
@@ -503,7 +504,7 @@ export default async function DetailPengajuan({ params }: { params: Promise<{ id
             <section className="flex flex-col gap-3 rounded-[20px] bg-ink p-5 text-white">
               <span className="text-[11px] font-semibold tracking-[0.08em] text-[#A9B0C2]">
                 RINGKASAN {info.a ? `· ${info.a.nama.toUpperCase()}` : ""}
-                {info.ev && ` · EVENT ${info.ev.nama.toUpperCase()}`}
+                {info.ev && ` · EVENT ${info.ev.nama.toUpperCase()} (KOMISI +${persen(info.ev.tambahanKomisiPersen)})`}
               </span>
               <dl className="grid grid-cols-2 gap-y-1.5 text-sm">
                 <dt className="text-[#A9B0C2]">Premi bruto</dt>
@@ -625,7 +626,10 @@ export default async function DetailPengajuan({ params }: { params: Promise<{ id
             <ol className="flex flex-col">
               {LANGKAH.map((l, i) => {
                 const k = i + 1;
-                const selesai = k < terakhirLangkah || (s === "selesai" && k === 12);
+                const w0 = waktuLangkah.get(l.status);
+                // Survei kendaraan opsional: bila tidak pernah dicatat, tampil sebagai "dilewati".
+                const dilewati = l.status === "survei_kendaraan" && !w0 && k < terakhirLangkah;
+                const selesai = !dilewati && (k < terakhirLangkah || (s === "selesai" && k === 12));
                 const sekarang = k === terakhirLangkah && s !== "selesai";
                 const w = waktuLangkah.get(l.status);
                 return (
@@ -636,14 +640,15 @@ export default async function DetailPengajuan({ params }: { params: Promise<{ id
                           "mt-0.5 size-4 shrink-0 rounded-full border-2",
                           selesai && "border-ink bg-ink",
                           sekarang && (n ? "border-brand bg-white ring-4 ring-brand-soft" : "border-bad bg-white ring-4 ring-bad-soft"),
-                          !selesai && !sekarang && "border-line-2 bg-white",
+                          !selesai && !sekarang && (dilewati ? "border-dashed border-ink-4 bg-white" : "border-line-2 bg-white"),
                         )}
                       />
-                      {k < 12 && <span className={clsx("w-0.5 flex-1", selesai ? "bg-ink" : "bg-line")} />}
+                      {k < 12 && <span className={clsx("w-0.5 flex-1", selesai || dilewati ? "bg-ink" : "bg-line")} />}
                     </div>
                     <div className="flex flex-1 justify-between gap-2 pb-3 text-sm">
                       <span className={clsx(sekarang ? "font-bold" : selesai ? "font-medium" : "text-ink-4")}>
                         {l.label}
+                        {dilewati && <span className="ml-1 text-[11px] font-normal italic">dilewati</span>}
                         <span className="ml-1 text-[11px] font-normal text-ink-4">{l.oleh}</span>
                       </span>
                       {w && <span className="text-[12px] text-ink-3">{tglJam(w)}</span>}

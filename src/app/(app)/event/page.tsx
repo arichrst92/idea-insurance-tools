@@ -54,7 +54,7 @@ export default async function HalamanEvent() {
         jejak={[{ label: "Event bagi hasil" }]}
         judul="Event"
         sorot="bagi hasil"
-        sub="Selama event, polis yang diinput memakai % bagi hasil kantor event (menggantikan % normal). Bila event tumpang tindih, dipakai % terendah."
+        sub="Selama event, porsi komisi sales bertambah dan porsi kantor berkurang sebesar tambahan itu. Bila beberapa event berlaku bersamaan, dipakai tambahan terbesar."
       />
       <div className={admin ? "grid items-start gap-4 lg:grid-cols-[1.5fr_1fr]" : "flex flex-col gap-4"}>
         <div className="flex flex-col gap-3">
@@ -72,7 +72,7 @@ export default async function HalamanEvent() {
                   </div>
                   <div className="flex items-center gap-2">
                     {!e.aktif ? <Lencana>NONAKTIF</Lencana> : berjalan ? <Lencana nada="ok">BERJALAN</Lencana> : e.tglMulai > hariIni ? <Lencana nada="brand">AKAN DATANG</Lencana> : <Lencana>SELESAI</Lencana>}
-                    <span className="rounded-full bg-ink px-3 py-1 text-sm font-extrabold text-white">Kantor {persen(e.bagiHasilKantorPersen)}</span>
+                    <span className="rounded-full bg-ink px-3 py-1 text-sm font-extrabold text-white">Komisi sales +{persen(e.tambahanKomisiPersen)}</span>
                   </div>
                 </div>
                 <dl className="grid grid-cols-3 gap-2 text-sm">
@@ -108,7 +108,14 @@ export default async function HalamanEvent() {
                 <Isian label="Mulai" name="tglMulai" type="date" required />
                 <Isian label="Selesai" name="tglSelesai" type="date" required />
               </div>
-              <Isian label="Bagi hasil kantor selama event (%)" name="bagiHasilKantorPersen" inputMode="decimal" placeholder="15" required />
+              <Isian
+                label="Tambahan komisi sales (%)"
+                name="tambahanKomisiPersen"
+                inputMode="decimal"
+                placeholder="15"
+                required
+                hint="Dari porsi sales. Contoh kantor 60 / sales 40, +15% → sales 46, kantor 54."
+              />
               <Pilihan label="Berlaku untuk" name="berlakuUntuk" defaultValue="semua">
                 <option value="semua">Semua sales</option>
                 <option value="fulltime">Fulltime saja</option>

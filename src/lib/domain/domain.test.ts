@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hitungKomisi, bagiHasilBerlaku, KomisiError, type EventAktif } from "./komisi";
+import { hitungKomisi, bagiHasilBerlaku, KomisiError, porsiKantorDenganEvent, type EventAktif } from "./komisi";
 import { hitungGaji, pencapaianPersen } from "./gaji";
 import { langkahNasabah, nomorLangkah, samarkanPlat, transisiSah } from "./journey";
 import { normalisasiNoWa } from "../wa";
@@ -25,8 +25,11 @@ describe("hitungKomisi — contoh di dokumen", () => {
     });
   });
 
-  it("event kantor 15% menaikkan komisi menjadi 1.020.000", () => {
-    expect(hitungKomisi({ ...dasar, bagiHasilKantorPersen: 15 }).komisiSalesRp).toBe(1_020_000);
+  it("event +15% komisi: sales 70% → 80,5%, kantor 19,5% → komisi 966.000", () => {
+    expect(hitungKomisi({ ...dasar, bagiHasilKantorPersen: porsiKantorDenganEvent(30, 15) })).toMatchObject({
+      bagianKantorRp: 234_000,
+      komisiSalesRp: 966_000,
+    });
   });
 
   it("menolak cashback nasabah di atas batas sales", () => {
@@ -40,13 +43,25 @@ describe("hitungKomisi — contoh di dokumen", () => {
   });
 });
 
+describe("porsiKantorDenganEvent — event menambah porsi sales", () => {
+  it.each([
+    [60, 15, 54], // contoh: kantor 60 / sales 40, +15% → sales 46, kantor 54
+    [30, 15, 19.5],
+    [50, 100, 0], // sales 50 × 2 = 100 → kantor 0
+    [20, 50, 0], // dibatasi: porsi sales maks 100%
+    [40, 0, 40],
+  ])("kantor %d%%, tambahan %d%% → kantor %d%%", (k, t, hasil) => {
+    expect(porsiKantorDenganEvent(k, t)).toBe(hasil);
+  });
+});
+
 describe("bagiHasilBerlaku", () => {
-  const sales = { id: "s1", tipeSales: "fulltime" as const, bagiHasilKantorPersen: 30 };
+  const sales = { id: "s1", tipeSales: "fulltime" as const, bagiHasilKantorPersen: 60 };
   const ev = (o: Partial<EventAktif>): EventAktif => ({
     id: "e",
     tglMulai: "2026-11-01",
     tglSelesai: "2026-12-31",
-    bagiHasilKantorPersen: 15,
+    tambahanKomisiPersen: 15,
     berlakuUntuk: "semua",
     salesIds: [],
     aktif: true,
@@ -54,24 +69,25 @@ describe("bagiHasilBerlaku", () => {
   });
 
   it("tanpa event pakai % normal", () => {
-    expect(bagiHasilBerlaku(sales, "2026-10-10", [ev({})])).toEqual({ persen: 30, eventId: null });
+    expect(bagiHasilBerlaku(sales, "2026-10-10", [ev({})])).toEqual({ persen: 60, eventId: null, tambahan: 0 });
   });
-  it("event berlaku menggantikan % normal", () => {
+  it("event menambah porsi sales 40 → 46, kantor 60 → 54", () => {
     expect(bagiHasilBerlaku(sales, "2026-11-05", [ev({ id: "akhir-tahun" })])).toEqual({
-      persen: 15,
+      persen: 54,
       eventId: "akhir-tahun",
+      tambahan: 15,
     });
   });
-  it("event tumpang tindih → % terendah", () => {
-    const r = bagiHasilBerlaku(sales, "2026-11-05", [ev({ id: "a", bagiHasilKantorPersen: 20 }), ev({ id: "b", bagiHasilKantorPersen: 10 })]);
-    expect(r).toEqual({ persen: 10, eventId: "b" });
+  it("event bersamaan → tambahan terbesar, tidak dijumlahkan", () => {
+    const r = bagiHasilBerlaku(sales, "2026-11-05", [ev({ id: "a", tambahanKomisiPersen: 10 }), ev({ id: "b", tambahanKomisiPersen: 25 })]);
+    expect(r).toEqual({ persen: 50, eventId: "b", tambahan: 25 });
   });
   it("event freelance tidak berlaku untuk fulltime", () => {
     expect(bagiHasilBerlaku(sales, "2026-11-05", [ev({ berlakuUntuk: "freelance" })]).eventId).toBeNull();
   });
   it("event pilihan hanya untuk sales terpilih", () => {
-    expect(bagiHasilBerlaku(sales, "2026-11-05", [ev({ berlakuUntuk: "pilihan", salesIds: ["s1"] })]).persen).toBe(15);
-    expect(bagiHasilBerlaku(sales, "2026-11-05", [ev({ berlakuUntuk: "pilihan", salesIds: ["s2"] })]).persen).toBe(30);
+    expect(bagiHasilBerlaku(sales, "2026-11-05", [ev({ berlakuUntuk: "pilihan", salesIds: ["s1"] })]).persen).toBe(54);
+    expect(bagiHasilBerlaku(sales, "2026-11-05", [ev({ berlakuUntuk: "pilihan", salesIds: ["s2"] })]).persen).toBe(60);
   });
 });
 

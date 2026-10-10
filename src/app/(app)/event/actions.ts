@@ -19,7 +19,10 @@ export async function buatEvent(_: StateForm, f: FormData): Promise<StateForm> {
       nama: z.string().min(3, "Nama event wajib diisi"),
       tglMulai: z.string().date("Isi tanggal mulai"),
       tglSelesai: z.string().date("Isi tanggal selesai"),
-      bagiHasilKantorPersen: z.number({ invalid_type_error: "Isi % bagi hasil kantor" }).min(0).max(100),
+      tambahanKomisiPersen: z
+        .number({ invalid_type_error: "Isi % tambahan komisi sales" })
+        .gt(0, "Tambahan komisi harus lebih dari 0%")
+        .max(200, "Tambahan komisi maks 200%"),
       berlakuUntuk: z.enum(["semua", "fulltime", "freelance", "pilihan"]),
       salesIds: z.array(z.string()),
     })
@@ -29,7 +32,7 @@ export async function buatEvent(_: StateForm, f: FormData): Promise<StateForm> {
       nama: teks(f, "nama"),
       tglMulai: teks(f, "tglMulai"),
       tglSelesai: teks(f, "tglSelesai"),
-      bagiHasilKantorPersen: teks(f, "bagiHasilKantorPersen") ? parsePersen(teks(f, "bagiHasilKantorPersen")) : undefined,
+      tambahanKomisiPersen: teks(f, "tambahanKomisiPersen") ? parsePersen(teks(f, "tambahanKomisiPersen")) : undefined,
       berlakuUntuk: teks(f, "berlakuUntuk") || "semua",
       salesIds: f.getAll("salesIds").map(String),
     });

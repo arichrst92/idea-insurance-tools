@@ -1,0 +1,1 @@
+ALTER TABLE "event_bagi_hasil" RENAME COLUMN "bagi_hasil_kantor_persen" TO "tambahan_komisi_persen";

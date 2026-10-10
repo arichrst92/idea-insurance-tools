@@ -158,7 +158,8 @@ export const eventBagiHasil = pgTable("event_bagi_hasil", {
   nama: text().notNull(),
   tglMulai: tanggal().notNull(),
   tglSelesai: tanggal().notNull(),
-  bagiHasilKantorPersen: persen().notNull(),
+  /** Tambahan porsi komisi sales (% dari porsi normalnya); porsi kantor berkurang sebesar itu */
+  tambahanKomisiPersen: persen().notNull(),
   berlakuUntuk: berlakuEventEnum().notNull().default("semua"),
   salesIds: text().array().notNull().default(sql`'{}'`),
   aktif: boolean().notNull().default(true),

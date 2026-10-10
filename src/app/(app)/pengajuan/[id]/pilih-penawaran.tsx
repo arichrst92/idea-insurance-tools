@@ -14,12 +14,14 @@ export function PilihPenawaran({
   maksCashback,
   bagiHasilKantor,
   namaEvent,
+  tambahanEvent,
 }: {
   aksi: (s: StateForm, f: FormData) => Promise<StateForm>;
   opsi: Opsi[];
   maksCashback: number;
   bagiHasilKantor: number;
   namaEvent: string | null;
+  tambahanEvent: number;
 }) {
   const [pilih, setPilih] = useState(opsi[0]?.id);
   const [cb, setCb] = useState(Math.min(15, maksCashback));
@@ -93,8 +95,8 @@ export function PilihPenawaran({
       {hasil && o && (
         <div className="rounded-2xl bg-ink p-4 text-white">
           <p className="mb-2 text-[11px] font-semibold tracking-[0.08em] text-[#A9B0C2]">
-            RINGKASAN · BAGI HASIL KANTOR {persen(bagiHasilKantor)}
-            {namaEvent && ` (EVENT ${namaEvent.toUpperCase()})`}
+            RINGKASAN · KANTOR {persen(bagiHasilKantor)} / SALES {persen(100 - bagiHasilKantor)}
+            {namaEvent && ` · EVENT ${namaEvent.toUpperCase()} +${persen(tambahanEvent)}`}
           </p>
           <dl className="grid grid-cols-2 gap-y-1 text-sm">
             <dt className="text-[#A9B0C2]">Dibayar nasabah</dt>
