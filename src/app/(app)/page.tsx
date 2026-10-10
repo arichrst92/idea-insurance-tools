@@ -1,7 +1,8 @@
 import Link from "next/link";
+import clsx from "clsx";
 import { and, count, desc, eq, gte, inArray, lte, or } from "drizzle-orm";
 import { db } from "@/db";
-import { kendaraan, klaim, nasabah, polis, type StatusPengajuan } from "@/db/schema";
+import { bengkel, kategoriPolis, kendaraan, klaim, nasabah, perusahaanAsuransi, polis, rekening, users, type StatusPengajuan } from "@/db/schema";
 import { tambahHari, waktuWib } from "@/lib/domain/perpanjangan";
 import { periode } from "@/lib/domain/periode";
 import { MASA_PERLU_DIURUS, STATUS_TERBIT } from "@/lib/perpanjangan";
@@ -28,7 +29,7 @@ export default async function Dashboard() {
   const hariIni = waktuWib().tanggal;
   const p = periode("bulan_ini", hariIni);
 
-  const [rows, [nHabis], [nKlaim], giliran, cair, targets, [nNasabah], onboarding] = await Promise.all([
+  const [rows, [nHabis], [nKlaim], giliran, cair, targets, [nNasabah], onboarding, persiapan] = await Promise.all([
     polisLunas(user, { dari: p.dari, sampai: p.sampai }),
     db
       .select({ n: count() })
@@ -63,6 +64,7 @@ export default async function Dashboard() {
     admin ? Promise.resolve(new Map()) : targetRentang(p.dari, p.sampai),
     db.select({ n: count() }).from(nasabah).where(admin ? undefined : eq(nasabah.salesId, user.id)),
     admin ? null : onboardingSales(user.id),
+    admin ? dataAwal() : null,
   ]);
   const t = total(rows, admin);
   const tertunggak = admin ? Object.values(cair.tahap).reduce((a, d) => a + d.length, 0) : cair.tahap.komisi.length;
@@ -75,7 +77,7 @@ export default async function Dashboard() {
     <>
       <KepalaHalaman jejak={[{ label: "Dashboard" }]} judul={`Halo ${namaDepan},`} sorot="selamat bekerja" sub={`Ringkasan ${p.label}.`} />
       {onboarding && !onboarding.ditutup && !onboarding.beres && <ChecklistOnboarding data={onboarding} ringkas />}
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6" data-uji="dashboard">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3" data-uji="dashboard">
         <Angka label="Premi bulan ini" nilai={rupiah(t?.premi ?? 0)} href="/laporan" />
         <Angka label="Polis lunas bulan ini" nilai={angka(t?.polis ?? 0)} sub={`${angka(nNasabah.n)} nasabah ${admin ? "terdaftar" : "Anda"}`} href="/polis" />
         {admin ? (
@@ -129,7 +131,7 @@ export default async function Dashboard() {
                   ["Revenue", c.pRev, `${rupiah(t?.premi ?? 0)} / ${rupiah(target.targetRevenue)}`],
                 ].map(([l, v, ket]) => (
                   <div key={l as string} className="flex flex-col gap-1">
-                    <div className="flex justify-between text-[13px]">
+                    <div className="flex flex-wrap justify-between gap-x-3 gap-y-0.5 text-[13px]">
                       <span className="font-semibold">{l}</span>
                       <span className="text-ink-3">
                         {ket} · <b className="text-ink">{persen(v as number)}</b>
@@ -149,24 +151,57 @@ export default async function Dashboard() {
             )}
           </Kartu>
         )}
-        {admin && (
-          <Kartu className="flex flex-col gap-3">
-            <h2 className="text-base font-bold">Siapkan data awal</h2>
-            <ol className="flex flex-col gap-2 text-sm text-ink-2">
-              <li>
-                1. <Link className="font-semibold text-brand" href="/master/asuransi">Perusahaan asuransi</Link> + email/WA PIC + paket coverage.
-              </li>
-              <li>
-                2. <Link className="font-semibold text-brand" href="/master/bengkel">Bengkel</Link> dan{" "}
-                <Link className="font-semibold text-brand" href="/master/rekening">rekening pembayaran & kantor</Link>.
-              </li>
-              <li>
-                3. <Link className="font-semibold text-brand" href="/sales">Sales</Link> + target bulanan — mereka langsung bisa masuk dengan OTP.
-              </li>
-            </ol>
+        {admin && persiapan && (
+          <Kartu className="flex flex-col gap-3" data-uji="data-awal">
+            <div className="flex items-baseline justify-between gap-2">
+              <h2 className="text-base font-bold">{persiapan.every((d) => d.ada) ? "Pintasan" : "Siapkan data awal"}</h2>
+              <span className="text-[13px] text-ink-3">
+                {persiapan.filter((d) => d.ada).length}/{persiapan.length} siap
+              </span>
+            </div>
+            <ul className="flex flex-col divide-y divide-line">
+              {persiapan.map((d) => (
+                <li key={d.href}>
+                  <Link href={d.href} className="flex items-center justify-between gap-3 py-2.5 text-sm hover:text-brand">
+                    <span className="flex min-w-0 items-center gap-2.5">
+                      <span
+                        aria-hidden
+                        className={clsx(
+                          "flex size-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold",
+                          d.ada ? "bg-ok-soft text-ok" : "border border-line-2 text-ink-4",
+                        )}
+                      >
+                        {d.ada ? "✓" : ""}
+                      </span>
+                      <span className="truncate font-semibold">{d.label}</span>
+                    </span>
+                    <span className="shrink-0 text-[13px] text-ink-3">{d.ada ? angka(d.n) : "Belum ada"}</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
           </Kartu>
         )}
       </div>
     </>
   );
+}
+
+/** Kelengkapan data master untuk admin (kartu "Siapkan data awal" → "Pintasan" bila semua sudah ada). */
+async function dataAwal() {
+  const n = (q: Promise<{ n: number }[]>) => q.then(([r]) => r.n);
+  const [asuransi, paket, bengkelN, rekKantor, sales] = await Promise.all([
+    n(db.select({ n: count() }).from(perusahaanAsuransi)),
+    n(db.select({ n: count() }).from(kategoriPolis)),
+    n(db.select({ n: count() }).from(bengkel)),
+    n(db.select({ n: count() }).from(rekening).where(inArray(rekening.pemilikTipe, ["pembayaran", "kantor"]))),
+    n(db.select({ n: count() }).from(users).where(and(eq(users.role, "sales"), eq(users.aktif, true)))),
+  ]);
+  return [
+    { label: "Perusahaan asuransi", href: "/master/asuransi", n: asuransi, ada: asuransi > 0 },
+    { label: "Paket coverage", href: "/master/kategori", n: paket, ada: paket > 0 },
+    { label: "Bengkel rekanan", href: "/master/bengkel", n: bengkelN, ada: bengkelN > 0 },
+    { label: "Rekening pembayaran & kantor", href: "/master/rekening", n: rekKantor, ada: rekKantor > 0 },
+    { label: "Sales aktif", href: "/sales", n: sales, ada: sales > 0 },
+  ];
 }

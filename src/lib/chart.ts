@@ -15,16 +15,16 @@ export function svgBar(p: { kategori: string[]; seri: Seri[]; lebar?: number; ti
     animation: false,
     textStyle: { fontFamily: "Inter, Arial, sans-serif", color: "#4B5563" },
     grid: { left: 52, right: 12, top: p.seri.length > 1 ? 34 : 16, bottom: 28 },
-    legend: p.seri.length > 1 ? { top: 0, right: 0, itemWidth: 10, itemHeight: 10, textStyle: { fontSize: 11 } } : undefined,
-    xAxis: { type: "category", data: p.kategori, axisTick: { show: false }, axisLine: { lineStyle: { color: "#E3E6EF" } }, axisLabel: { fontSize: 11 } },
-    yAxis: { type: "value", splitLine: { lineStyle: { color: "#EEF0F5" } }, axisLabel: { fontSize: 10, formatter: singkat } },
+    legend: p.seri.length > 1 ? { top: 0, right: 0, itemWidth: 10, itemHeight: 10, textStyle: { fontSize: 13 } } : undefined,
+    xAxis: { type: "category", data: p.kategori, axisTick: { show: false }, axisLine: { lineStyle: { color: "#E3E6EF" } }, axisLabel: { fontSize: 13 } },
+    yAxis: { type: "value", splitLine: { lineStyle: { color: "#EEF0F5" } }, axisLabel: { fontSize: 12, formatter: singkat } },
     series: p.seri.map((s) => ({
       name: s.nama,
       type: "bar",
       data: s.data,
       barMaxWidth: 28,
       itemStyle: { color: s.warna, borderRadius: [4, 4, 0, 0] },
-      label: p.label ? { show: true, position: "top", fontSize: 10, formatter: ({ value }: { value: number }) => (value ? singkat(value) : "") } : undefined,
+      label: p.label ? { show: true, position: "top", fontSize: 12, formatter: ({ value }: { value: number }) => (value ? singkat(value) : "") } : undefined,
     })),
   });
   const svg = chart.renderToSVGString();

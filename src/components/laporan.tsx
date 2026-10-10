@@ -92,9 +92,11 @@ export function FilterPeriode({
 /** Kartu angka ringkas. */
 export function Angka({ label, nilai, sub, href, nada }: { label: string; nilai: ReactNode; sub?: ReactNode; href?: string; nada?: "warn" | "bad" | "ok" }) {
   const isi = (
-    <Kartu className={clsx("flex h-full flex-col gap-1", href && "transition hover:border-brand")}>
-      <span className="text-[13px] font-medium text-ink-3">{label}</span>
-      <span className={clsx("whitespace-nowrap text-[19px] font-extrabold tracking-tight tabular-nums sm:text-2xl lg:text-[28px]", nada === "warn" && "text-warn", nada === "bad" && "text-bad", nada === "ok" && "text-ok")}>
+    // @container: ukuran angka mengikuti lebar kartu (cqi), jadi nominal panjang tidak pernah
+    // keluar dari kartu di layar sempit maupun grid yang rapat.
+    <Kartu className={clsx("@container flex h-full min-w-0 flex-col gap-1 p-4 sm:p-5", href && "transition hover:border-brand")}>
+      <span className="text-[13px] font-medium leading-snug text-ink-3">{label}</span>
+      <span className={clsx("whitespace-nowrap text-[clamp(0.95rem,8.5cqi,1.75rem)] font-extrabold leading-tight tracking-tight tabular-nums", nada === "warn" && "text-warn", nada === "bad" && "text-bad", nada === "ok" && "text-ok")}>
         {nilai}
       </span>
       {sub && <span className="text-[12px] text-ink-3">{sub}</span>}
@@ -130,7 +132,31 @@ export function TabelBar<T>({
       {baris.length === 0 ? (
         <p className="px-5 pb-5 text-sm text-ink-3">{kosong}</p>
       ) : (
-        <div className="overflow-x-auto">
+        <>
+        {/* HP: tiap baris jadi kartu kecil supaya angka tidak terpotong / perlu digeser */}
+        <ul className="flex flex-col divide-y divide-line border-t border-line sm:hidden">
+          {baris.map((r, i) => (
+            <li key={i} className="flex flex-col gap-2 px-4 py-3">
+              {bar && (
+                <div>
+                  <div className="text-sm font-semibold">{bar.label(r)}</div>
+                  <div className="mt-1 h-1.5 rounded-full bg-canvas">
+                    <div className="h-1.5 rounded-full bg-brand" style={{ width: `${Math.max(2, (bar.nilai(r) / maks) * 100)}%` }} />
+                  </div>
+                </div>
+              )}
+              <dl className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-[13px]">
+                {kolom.map((k) => (
+                  <div key={k.label} className="flex min-w-0 flex-col">
+                    <dt className="text-[11px] uppercase tracking-wider text-ink-3">{k.label}</dt>
+                    <dd className="break-words font-semibold tabular-nums">{k.nilai(r)}</dd>
+                  </div>
+                ))}
+              </dl>
+            </li>
+          ))}
+        </ul>
+        <div className="hidden overflow-x-auto sm:block">
           <table className={clsx("w-full text-sm", kolom.length <= 3 ? "min-w-[340px]" : "min-w-[880px]")}>
             <thead className="text-left text-[11px] uppercase tracking-wider text-ink-3">
               <tr className="border-b border-line">
@@ -164,6 +190,7 @@ export function TabelBar<T>({
             {kaki}
           </table>
         </div>
+        </>
       )}
     </Kartu>
   );

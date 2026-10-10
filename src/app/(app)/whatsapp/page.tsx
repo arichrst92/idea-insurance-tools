@@ -36,8 +36,8 @@ export default async function HalamanWhatsApp({ searchParams }: { searchParams: 
           {!process.env.FONNTE_WEBHOOK_SECRET && <Lencana nada="warn">FONNTE_WEBHOOK_SECRET BELUM DIISI</Lencana>}
         </div>
         <p className="text-[13px] text-ink-3">
-          Webhook di dashboard Fonnte → pesan masuk: <code className="rounded bg-canvas px-1">{app}/api/webhook/fonnte?k=…</code> · status pesan:{" "}
-          <code className="rounded bg-canvas px-1">{app}/api/webhook/fonnte-status?k=…</code> (k = FONNTE_WEBHOOK_SECRET)
+          Webhook di dashboard Fonnte → pesan masuk: <code className="break-all rounded bg-canvas px-1">{app}/api/webhook/fonnte?k=…</code> · status pesan:{" "}
+          <code className="break-all rounded bg-canvas px-1">{app}/api/webhook/fonnte-status?k=…</code> (k = FONNTE_WEBHOOK_SECRET)
         </p>
       </Kartu>
       <nav aria-label="Bagian" className="overflow-x-auto">

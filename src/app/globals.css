@@ -55,3 +55,23 @@ body {
 .dock-item:hover .dock-tile {
   transform: translateY(-4px) scale(1.08);
 }
+
+/* Tabel lebar di layar sempit: bayangan di tepi menandakan masih bisa digeser,
+   dan kolom pertama menempel supaya baris tetap terbaca saat digeser. */
+.overflow-x-auto:has(> table) {
+  background:
+    linear-gradient(to right, #fff 30%, rgb(255 255 255 / 0)) left / 32px 100% no-repeat local,
+    linear-gradient(to left, #fff 30%, rgb(255 255 255 / 0)) right / 32px 100% no-repeat local,
+    radial-gradient(farthest-side at 0 50%, rgb(11 15 26 / 0.14), transparent) left / 12px 100% no-repeat scroll,
+    radial-gradient(farthest-side at 100% 50%, rgb(11 15 26 / 0.14), transparent) right / 12px 100% no-repeat scroll;
+  -webkit-overflow-scrolling: touch;
+}
+@media (max-width: 639px) {
+  .overflow-x-auto > table :is(th, td):first-child {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background: #fff;
+    box-shadow: 1px 0 0 var(--color-line);
+  }
+}

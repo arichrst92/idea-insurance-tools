@@ -6,6 +6,8 @@ const nextConfig: NextConfig = {
   // Image Docker kecil: hanya server mandiri + file yang dipakai.
   output: "standalone",
   poweredByHeader: false,
+  // Tombol "N" dev Next.js menutupi dock di pojok kiri bawah.
+  devIndicators: false,
   // Upload KTP/STNK/foto/PDF lewat server action: maks 10 MB per file, beberapa file
   // sekaligus. Foto dikecilkan di browser dulu (lib/kompres-gambar.ts), jadi batas ini
   // hanya jaring pengaman. Middleware ikut membaca body, jadi batasnya disamakan.
