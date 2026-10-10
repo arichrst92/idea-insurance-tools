@@ -11,13 +11,14 @@ Dokumen perencanaan (sprint, model komisi, struktur data) ada di Claude Docs: *S
 | UI | Tailwind CSS v4, ikon lucide, font Inter (self-hosted) |
 | Database | PostgreSQL 16 + Drizzle ORM (migrasi SQL di `drizzle/`) |
 | Login | OTP WhatsApp via Fonnte, sesi 30 hari (sliding) di tabel `sessions` |
-| Infra | Docker Compose (Postgres, Redis, MinIO), Nginx di host |
+| File upload | Filesystem (`STORAGE_DIR`, bawaan `./storage`), diakses lewat route yang memeriksa hak akses |
+| Infra | Docker Compose (Postgres, Redis), Nginx di host |
 
 ## Menjalankan di lokal
 
 ```bash
 cp .env.example .env.local          # isi AUTH_SECRET
-docker compose up -d db redis minio
+docker compose up -d db redis
 npm install
 npm run db:migrate
 ADMIN_NAMA="Nama Anda" ADMIN_NO_WA=0812xxxxxxx npm run db:seed
@@ -73,7 +74,7 @@ src/
 ## Status sprint
 
 - [x] **Sprint 1 — Fondasi & login**: repo, skema database lengkap, Docker, CI, login OTP + sesi persisten, role admin/sales, dock & breadcrumb, master asuransi (+ kontak email & WA PIC), kategori polis, bengkel, rekening kantor, form sales (fulltime/freelance, target bulanan, gaji pokok, bagi hasil, maks cashback, rekening)
-- [x] **Sprint 2 — Nasabah & kendaraan**: daftar + cari (nama, no. WA, plat) + filter, tambah/ubah nasabah & kendaraan, data dibatasi per sales, upload KTP/STNK/foto (privat, lewat /api/dokumen), rekening cashback nasabah, tandai kendaraan dijual/tidak dipakai, pindah kepemilikan, nonaktifkan/aktifkan sales + pengalihan nasabah
+- [x] **Sprint 2 — Nasabah & kendaraan**: daftar + cari (nama, no. WA, plat) + filter, tambah/ubah nasabah & kendaraan, data dibatasi per sales, upload KTP/STNK/foto (filesystem privat, lewat /api/dokumen), rekening cashback nasabah, tandai kendaraan dijual/tidak dipakai, pindah kepemilikan, nonaktifkan/aktifkan sales + pengalihan nasabah
 - [x] **Sprint 3 — Pengajuan, polis & cashback**: journey 12 status + riwayat, cek kelengkapan dokumen, kirim data ke asuransi (email SendGrid + WhatsApp Fonnte ke PIC master), penawaran, persetujuan nasabah + hitung komisi (event otomatis), polis terbit + PDF, instruksi bayar dengan PDF terlampir (cadangan wa.me), lunas + bukti, setor/cair/transfer → selesai, revisi/tolak/batal, notifikasi giliran sales, event bagi hasil, daftar polis, link tracker nasabah publik (/t) + unduh PDF dengan 4 digit WA
 - [ ] Sprint 4 — Perpanjangan & klaim
 - [ ] Sprint 5 — Laporan & pencairan

@@ -1,13 +1,13 @@
 import "server-only";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { createId } from "@/lib/id";
 
-// Penyimpanan file privat (KTP, STNK, foto, PDF polis, bukti transfer).
-// - S3_ENDPOINT diisi → S3-compatible (MinIO di VPS).
-// - Kosong → folder lokal ./storage (development, tanpa Docker).
-// File tidak pernah diakses langsung; selalu lewat /api/dokumen/[id] yang memeriksa hak akses.
+// Penyimpanan file privat (KTP, STNK, foto, PDF polis, bukti transfer) di filesystem.
+// Folder: STORAGE_DIR (bawaan ./storage di folder aplikasi). Di server, arahkan ke
+// volume yang di-backup, mis. /var/lib/insurance/storage.
+// File tidak pernah diakses langsung; selalu lewat /api/dokumen/[id] (cek hak akses)
+// atau link unduh berbatas waktu /p/[kode].
 
 export const MAKS_UKURAN = 10 * 1024 * 1024; // 10 MB
 export const TIPE_DIIZINKAN: Record<string, string> = {
@@ -18,24 +18,21 @@ export const TIPE_DIIZINKAN: Record<string, string> = {
   "application/pdf": "pdf",
 };
 
-const FOLDER_LOKAL = path.join(process.cwd(), "storage");
-
-let s3: S3Client | null = null;
-function klienS3(): S3Client | null {
-  if (!process.env.S3_ENDPOINT) return null;
-  s3 ??= new S3Client({
-    endpoint: process.env.S3_ENDPOINT,
-    region: process.env.S3_REGION ?? "us-east-1",
-    forcePathStyle: true,
-    credentials: { accessKeyId: process.env.S3_ACCESS_KEY ?? "", secretAccessKey: process.env.S3_SECRET_KEY ?? "" },
-  });
-  return s3;
+export function folderStorage(): string {
+  return path.resolve(process.env.STORAGE_DIR || path.join(process.cwd(), "storage"));
 }
-const bucket = () => process.env.S3_BUCKET ?? "insurance";
+
+/** Path absolut untuk key; menolak key yang mencoba keluar dari folder storage. */
+function pathFile(key: string): string {
+  const root = folderStorage();
+  const p = path.resolve(root, key);
+  if (!p.startsWith(root + path.sep)) throw new Error("Key file tidak valid");
+  return p;
+}
 
 export class FileTidakValid extends Error {}
 
-/** Simpan file upload; mengembalikan key penyimpanan. */
+/** Simpan file upload; mengembalikan key relatif, mis. kendaraan/2026-10/ab12….jpg */
 export async function simpanFile(file: File, folder: string): Promise<string> {
   const ext = TIPE_DIIZINKAN[file.type];
   if (!ext) throw new FileTidakValid("Format file harus JPG, PNG, WEBP, HEIC, atau PDF");
@@ -43,26 +40,17 @@ export async function simpanFile(file: File, folder: string): Promise<string> {
   if (file.size > MAKS_UKURAN) throw new FileTidakValid("Ukuran file maksimal 10 MB");
 
   const key = `${folder}/${new Date().toISOString().slice(0, 7)}/${createId()}.${ext}`;
-  const isi = Buffer.from(await file.arrayBuffer());
-  const c = klienS3();
-  if (c) {
-    await c.send(new PutObjectCommand({ Bucket: bucket(), Key: key, Body: isi, ContentType: file.type }));
-  } else {
-    const tujuan = path.join(FOLDER_LOKAL, key);
-    await mkdir(path.dirname(tujuan), { recursive: true });
-    await writeFile(tujuan, isi);
-  }
+  const tujuan = pathFile(key);
+  await mkdir(path.dirname(tujuan), { recursive: true });
+  // Tulis ke file sementara lalu rename, agar tidak ada file setengah jadi bila proses terputus.
+  const sementara = `${tujuan}.part`;
+  await writeFile(sementara, Buffer.from(await file.arrayBuffer()));
+  await rename(sementara, tujuan);
   return key;
 }
 
 export async function bacaFile(key: string): Promise<Buffer> {
-  if (key.includes("..")) throw new Error("Key tidak valid");
-  const c = klienS3();
-  if (c) {
-    const res = await c.send(new GetObjectCommand({ Bucket: bucket(), Key: key }));
-    return Buffer.from(await res.Body!.transformToByteArray());
-  }
-  return readFile(path.join(FOLDER_LOKAL, key));
+  return readFile(pathFile(key));
 }
 
 export function tipeKonten(key: string): string {

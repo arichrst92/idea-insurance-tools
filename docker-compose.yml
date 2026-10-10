@@ -1,4 +1,4 @@
-# Development: `docker compose up -d db redis minio` lalu `npm run dev`.
+# Development: `docker compose up -d db redis` lalu `npm run dev`.
 # Production (VPS): `docker compose --profile prod up -d --build`.
 
 services:
@@ -26,19 +26,6 @@ services:
     ports:
       - "127.0.0.1:6379:6379"
 
-  minio:
-    image: minio/minio:latest
-    restart: unless-stopped
-    command: server /data --console-address ":9001"
-    environment:
-      MINIO_ROOT_USER: ${S3_ACCESS_KEY:-minio}
-      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:-minio-secret}
-    volumes:
-      - miniodata:/data
-    ports:
-      - "127.0.0.1:9000:9000"
-      - "127.0.0.1:9001:9001"
-
   migrate:
     profiles: ["prod"]
     build: { context: ., target: migrate }
@@ -56,7 +43,9 @@ services:
     environment:
       DATABASE_URL: postgresql://insurance:${POSTGRES_PASSWORD:-insurance}@db:5432/insurance
       REDIS_URL: redis://redis:6379
-      S3_ENDPOINT: http://minio:9000
+      STORAGE_DIR: /data/storage
+    volumes:
+      - storage:/data/storage # file upload; ikut di-backup
     ports:
       - "127.0.0.1:3000:3000" # Nginx di host meneruskan insurance.ide.asia → :3000
     depends_on:
@@ -65,4 +54,4 @@ services:
 volumes:
   pgdata:
   redisdata:
-  miniodata:
+  storage:
