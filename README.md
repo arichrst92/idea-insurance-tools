@@ -46,7 +46,7 @@ docker compose --profile prod up -d --build
 docker compose --profile prod run --rm migrate npx tsx scripts/seed.ts   # sekali, untuk admin pertama
 ```
 
-Aplikasi listen di `127.0.0.1:3000`; Nginx di host meneruskan `insurance.ide.asia` ke sana dengan SSL (Certbot).
+Aplikasi listen di `127.0.0.1:3000`; Nginx di host meneruskan `insurance.ide.asia` ke sana dengan SSL (Certbot). Set `client_max_body_size 50m;` di blok server Nginx agar upload beberapa file sekaligus tidak ditolak.
 
 ## Struktur
 

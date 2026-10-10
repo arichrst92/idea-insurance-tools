@@ -565,7 +565,7 @@ export async function catatTransfer(id: string, jenis: "nasabah" | "sales", _: S
     return { error: jenis === "nasabah" ? "Cashback nasabah ditransfer setelah premi lunas" : "Komisi ditransfer setelah cashback cair" };
 
   return jalankan(async () => {
-    await simpanDokumenPolis(f, "bukti", id, jenis === "nasabah" ? "bukti_transfer_cashback_nasabah" : "bukti_transfer_komisi", user.id);
+    const buktiId = await simpanDokumenPolis(f, "bukti", id, jenis === "nasabah" ? "bukti_transfer_cashback_nasabah" : "bukti_transfer_komisi", user.id);
     const patch = jenis === "nasabah" ? { tglTransferNasabah: tgl } : { tglTransferSales: tgl };
     const [baru] = await db.update(polis).set(patch).where(eq(polis.id, id)).returning();
     await db.insert(statusHistory).values({
@@ -584,8 +584,17 @@ export async function catatTransfer(id: string, jenis: "nasabah" | "sales", _: S
           .select()
           .from(rekening)
           .where(and(eq(rekening.pemilikTipe, "nasabah"), eq(rekening.pemilikId, baris.n.id), eq(rekening.utama, true)));
-        const isi = await isiTemplate("cashback_ditransfer", { ...vars, rekening_nasabah: r ? `${r.namaBank} ${r.noRekening}` : "rekening Bapak/Ibu" });
-        await kirimPesan({ ke: baris.n.noWa, isi, jenis: "notifikasi", polisId: id, userId: user.id });
+        let isi = await isiTemplate("cashback_ditransfer", { ...vars, rekening_nasabah: r ? `${r.namaBank} ${r.noRekening}` : "rekening Bapak/Ibu" });
+        // Template menyebut bukti terlampir; tanpa bukti, kalimat itu dihapus.
+        if (!buktiId) isi = isi.replace(/\s*Bukti transfer terlampir\.?/i, "");
+        await kirimPesan({
+          ke: baris.n.noWa,
+          isi,
+          jenis: "notifikasi",
+          polisId: id,
+          userId: user.id,
+          ...(buktiId ? { lampiranUrl: await buatLinkUnduh(buktiId, 30), namaLampiran: "Bukti transfer cashback" } : {}),
+        });
       } catch (e) {
         console.error("[pesan cashback]", e);
       }

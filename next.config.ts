@@ -4,8 +4,13 @@ const nextConfig: NextConfig = {
   // Image Docker kecil: hanya server mandiri + file yang dipakai.
   output: "standalone",
   poweredByHeader: false,
-  // Upload KTP/STNK/foto/PDF lewat server action (maks 10 MB per file).
-  experimental: { serverActions: { bodySizeLimit: "12mb" } },
+  // Upload KTP/STNK/foto/PDF lewat server action: maks 10 MB per file, beberapa file
+  // sekaligus. Foto dikecilkan di browser dulu (lib/kompres-gambar.ts), jadi batas ini
+  // hanya jaring pengaman. Middleware ikut membaca body, jadi batasnya disamakan.
+  experimental: {
+    serverActions: { bodySizeLimit: "50mb" },
+    middlewareClientMaxBodySize: "50mb",
+  },
   async headers() {
     return [
       {

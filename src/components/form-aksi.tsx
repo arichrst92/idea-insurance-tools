@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useEffect, useRef, startTransition, type FormEvent, type ReactNode } from "react";
+import { useActionState, useEffect, useRef, useState, startTransition, type FormEvent, type ReactNode } from "react";
+import { siapkanUpload } from "@/lib/kompres-gambar";
 import { Pesan, Tombol } from "./ui";
 
 export type StateForm = {
@@ -11,15 +12,26 @@ export type StateForm = {
 };
 
 /**
- * Jalankan server action lewat onSubmit (bukan prop `action`) supaya React
+ * Jalankan server action lewat onSubmit (bukan hanya prop `action`) supaya React
  * tidak mengosongkan isian ketika server menolak data — pengguna cukup
- * memperbaiki satu isian lalu kirim ulang.
+ * memperbaiki satu isian lalu kirim ulang. Foto dikecilkan dulu di browser
+ * sehingga upload dari HP tetap cepat dan tidak melewati batas ukuran request.
  */
-export function kirimTanpaReset(jalankan: (f: FormData) => void) {
-  return (e: FormEvent<HTMLFormElement>) => {
+export function kirimTanpaReset(jalankan: (f: FormData) => void, opsi?: { onGalat?: (pesan: string | null) => void; onProses?: (b: boolean) => void }) {
+  return async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const submitter = (e.nativeEvent as SubmitEvent).submitter as HTMLElement | null;
     const data = new FormData(e.currentTarget, submitter);
+    const adaFile = [...data.values()].some((v) => v instanceof File && v.size > 0);
+    if (adaFile) {
+      opsi?.onProses?.(true);
+      const galat = await siapkanUpload(data);
+      opsi?.onProses?.(false);
+      opsi?.onGalat?.(galat);
+      if (galat) return;
+    } else {
+      opsi?.onGalat?.(null);
+    }
     startTransition(() => jalankan(data));
   };
 }
@@ -41,6 +53,8 @@ export function FormAksi({
   varian?: "utama" | "kedua" | "bahaya";
 }) {
   const [state, jalankan, pending] = useActionState(aksi, {});
+  const [galatLokal, setGalatLokal] = useState<string | null>(null);
+  const [menyiapkan, setMenyiapkan] = useState(false);
   const ref = useRef<HTMLFormElement>(null);
   useEffect(() => {
     if (resetSetelahOk && state.ok) ref.current?.reset();
@@ -48,12 +62,17 @@ export function FormAksi({
   }, [state, resetSetelahOk]);
 
   return (
-    <form ref={ref} action={jalankan} onSubmit={kirimTanpaReset(jalankan)} className={className ?? "flex flex-col gap-4"}>
+    <form
+      ref={ref}
+      action={jalankan}
+      onSubmit={kirimTanpaReset(jalankan, { onGalat: setGalatLokal, onProses: setMenyiapkan })}
+      className={className ?? "flex flex-col gap-4"}
+    >
       {children}
-      <Pesan error={state.error} ok={state.ok} />
+      <Pesan error={galatLokal ?? state.error} ok={galatLokal ? undefined : state.ok} />
       <div>
-        <Tombol varian={varian} disabled={pending}>
-          {pending ? "Menyimpan…" : tombol}
+        <Tombol varian={varian} disabled={pending || menyiapkan}>
+          {menyiapkan ? "Menyiapkan file…" : pending ? "Menyimpan…" : tombol}
         </Tombol>
       </div>
     </form>
