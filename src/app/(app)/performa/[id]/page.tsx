@@ -45,7 +45,7 @@ export default async function DetailPerforma({ params }: { params: Promise<{ id:
         sub={`${fulltime ? "Fulltime" : "Freelance"} · ${namaBulanId(k.bulan)} berjalan`}
       />
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Angka label="Polis bulan ini" nilai={angka(k.polis)} />
+        <Angka label="Polis lunas bulan ini" nilai={angka(k.polis)} />
         <Angka label="Premi bulan ini" nilai={rupiah(k.premi)} />
         <Angka label={user.id === id ? "Komisi Anda" : "Komisi"} nilai={rupiah(k.komisi)} />
         <Angka label="Bulan achieve" nilai={`${d.achieve} / ${d.achieve + d.tidakAchieve}`} sub={d.achieve + d.tidakAchieve ? `${d.rasioAchieve}% bulan tercapai (12 bln)` : "Belum ada bulan ditutup"} />
@@ -57,7 +57,7 @@ export default async function DetailPerforma({ params }: { params: Promise<{ id:
           <Progres label="Case (polis)" nilai={k.polis} target={k.target.targetCase} p={k.capaian.pCase} format={angka} />
           <Progres label="Revenue (premi)" nilai={k.premi} target={k.target.targetRevenue} p={k.capaian.pRev} format={rupiah} />
           <p className="text-[13px] text-ink-3">
-            Target utama: <b>{k.capaian.utama}</b>. Bulan dihitung achieve bila target utama tercapai (≥ 100%).
+            Target utama: <b>{k.capaian.utama}</b>. Polis dihitung pada bulan tanggal lunasnya. Bulan dihitung achieve bila target utama tercapai (≥ 100%).
           </p>
           {d.estimasiGaji && (
             <div className="rounded-2xl bg-canvas p-4 text-sm" data-uji="estimasi-gaji">

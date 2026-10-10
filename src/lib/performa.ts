@@ -1,16 +1,15 @@
 import "server-only";
-import { and, asc, eq, gte, inArray, lte, sql } from "drizzle-orm";
+import { and, asc, eq, gte, lte, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { polis, targetSales, users } from "@/db/schema";
-import { STATUS_TERBIT } from "@/lib/perpanjangan";
-import { tglTerbitSql } from "@/lib/laporan";
+import { sudahLunas } from "@/lib/laporan";
 import { hitungGaji, pencapaianPersen } from "@/lib/domain/gaji";
 import { akhirDariBulan, awalBulan, geserBulan, rasio } from "@/lib/domain/periode";
 
 export type Realisasi = { salesId: string; polis: number; premi: number; komisi: number };
 
 /**
- * Realisasi semua sales (polis terbit & premi) dalam rentang — dipakai untuk peringkat.
+ * Realisasi semua sales (polis lunas & premi, menurut tanggal lunas) dalam rentang — dipakai untuk peringkat & target.
  * Hasilnya tidak pernah dikirim utuh ke sales; halaman sales hanya menampilkan baris & peringkatnya sendiri.
  */
 export async function realisasiSemua(dari: string, sampai: string): Promise<Map<string, Realisasi>> {
@@ -22,14 +21,14 @@ export async function realisasiSemua(dari: string, sampai: string): Promise<Map<
       komisi: sql<number>`coalesce(sum(${polis.komisiSalesRp}), 0)`.mapWith(Number),
     })
     .from(polis)
-    .where(and(inArray(polis.statusPengajuan, [...STATUS_TERBIT]), sql`${tglTerbitSql} between ${dari} and ${sampai}`))
+    .where(and(sudahLunas, sql`${polis.tglBayar} between ${dari} and ${sampai}`))
     .groupBy(polis.salesId);
   return new Map(rows.map((r) => [r.salesId, r]));
 }
 
 /** Realisasi satu sales per bulan (YYYY-MM-01 → angka). */
 export async function realisasiBulanan(salesId: string, dariBulan: string, sampaiBulan: string) {
-  const bulanSql = sql<string>`substr(${tglTerbitSql}, 1, 7) || '-01'`;
+  const bulanSql = sql<string>`to_char(${polis.tglBayar}, 'YYYY-MM') || '-01'`;
   const rows = await db
     .select({
       bulan: bulanSql,
@@ -41,8 +40,8 @@ export async function realisasiBulanan(salesId: string, dariBulan: string, sampa
     .where(
       and(
         eq(polis.salesId, salesId),
-        inArray(polis.statusPengajuan, [...STATUS_TERBIT]),
-        sql`${tglTerbitSql} between ${dariBulan} and ${akhirDariBulan(sampaiBulan)}`,
+        sudahLunas,
+        sql`${polis.tglBayar} between ${dariBulan} and ${akhirDariBulan(sampaiBulan)}`,
       ),
     )
     .groupBy(bulanSql);

@@ -1,6 +1,6 @@
 import ExcelJS from "exceljs";
 import { sesiSekarang } from "@/lib/auth/session";
-import { agregasi, polisTerbit, renewal, ringkasKlaim, total, type Agregat } from "@/lib/laporan";
+import { agregasi, polisLunas, renewal, ringkasKlaim, total, type Agregat } from "@/lib/laporan";
 import { filterDari, type SP } from "@/app/(app)/laporan/util";
 import { catatEksporExcel } from "@/lib/ekspor/simpan";
 
@@ -13,7 +13,7 @@ export async function GET(req: Request) {
   const admin = user.role === "admin";
   const sp = Object.fromEntries(new URL(req.url).searchParams) as SP;
   const { p, f } = filterDari(sp);
-  const [rows, ren, kl] = await Promise.all([polisTerbit(user, f), renewal(user, f), ringkasKlaim(user, f)]);
+  const [rows, ren, kl] = await Promise.all([polisLunas(user, f), renewal(user, f), ringkasKlaim(user, f)]);
 
   const wb = new ExcelJS.Workbook();
   wb.creator = "Rekap Asuransi";
@@ -31,7 +31,7 @@ export async function GET(req: Request) {
   r1.columns = [{ width: 32 }, { width: 22 }];
   const isi: [string, string | number][] = [
     ["Periode", `${p.label} (${p.dari} s/d ${p.sampai})`],
-    ["Polis terbit", t?.polis ?? 0],
+    ["Polis lunas", t?.polis ?? 0],
     ["Premi", t?.premi ?? 0],
     ...(admin ? ([["Cashback asuransi", t?.cashbackTotal ?? 0], ["Bagian kantor", t?.bagianKantor ?? 0]] as [string, number][]) : []),
     ["Cashback nasabah", t?.cashbackNasabah ?? 0],
@@ -71,7 +71,7 @@ export async function GET(req: Request) {
   // Detail
   const d = wb.addWorksheet("Detail polis");
   d.columns = [
-    { header: "Tgl terbit", key: "tglTerbit", width: 12 },
+    { header: "Tgl lunas", key: "tglLunas", width: 12 },
     { header: "Kode", key: "kode", width: 10 },
     { header: "No. polis", key: "noPolis", width: 18 },
     { header: "Nasabah", key: "nasabah", width: 24 },

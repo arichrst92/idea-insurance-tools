@@ -52,11 +52,11 @@ export default async function HalamanPerforma({ searchParams }: { searchParams: 
     const c = capaian(t, saya);
     return (
       <>
-        <KepalaHalaman jejak={[{ label: "Performa" }]} judul="Performa" sorot="saya" sub="Dihitung dari polis yang terbit di periode ini." />
+        <KepalaHalaman jejak={[{ label: "Performa" }]} judul="Performa" sorot="saya" sub="Dihitung dari polis yang lunas (dibayar nasabah) di periode ini — acuan target & gaji." />
         <FilterPeriode aksi="/performa" p={p} nilai={{}} tampilkan={[]} />
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4" data-uji="performa-saya">
           <Angka label="Peringkat" nilai={`#${saya.rank}`} sub={`dari ${urut.length} sales (berdasarkan premi)`} nada={saya.rank <= 3 ? "ok" : undefined} />
-          <Angka label="Polis terbit" nilai={angka(saya.polis)} />
+          <Angka label="Polis lunas" nilai={angka(saya.polis)} />
           <Angka label="Premi" nilai={rupiah(saya.premi)} />
           <Angka label="Komisi Anda" nilai={rupiah(saya.komisi)} />
         </div>
@@ -78,7 +78,7 @@ export default async function HalamanPerforma({ searchParams }: { searchParams: 
   const top = urut.filter((r) => r.premi > 0).slice(0, 3);
   return (
     <>
-      <KepalaHalaman jejak={[{ label: "Performa" }]} judul="Performa" sorot="sales" sub="Peringkat berdasarkan premi polis yang terbit di periode ini. Sales hanya melihat performa & peringkatnya sendiri." />
+      <KepalaHalaman jejak={[{ label: "Performa" }]} judul="Performa" sorot="sales" sub="Peringkat berdasarkan premi polis yang lunas di periode ini (acuan target & gaji). Sales hanya melihat performa & peringkatnya sendiri." />
       <FilterPeriode aksi="/performa" p={p} nilai={{}} tampilkan={[]} />
       {top.length > 0 && (
         <div className="grid gap-3 sm:grid-cols-3" data-uji="top-performer">

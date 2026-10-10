@@ -5,7 +5,7 @@ import { kendaraan, klaim, nasabah, polis, type StatusPengajuan } from "@/db/sch
 import { tambahHari, waktuWib } from "@/lib/domain/perpanjangan";
 import { periode } from "@/lib/domain/periode";
 import { MASA_PERLU_DIURUS, STATUS_TERBIT } from "@/lib/perpanjangan";
-import { polisTerbit, total } from "@/lib/laporan";
+import { polisLunas, total } from "@/lib/laporan";
 import { dataPencairan } from "@/lib/pencairan";
 import { capaian, targetRentang } from "@/lib/performa";
 import { wajibLogin } from "@/lib/auth/session";
@@ -27,7 +27,7 @@ export default async function Dashboard() {
   const p = periode("bulan_ini", hariIni);
 
   const [rows, [nHabis], [nKlaim], giliran, cair, targets, [nNasabah]] = await Promise.all([
-    polisTerbit(user, { dari: p.dari, sampai: p.sampai }),
+    polisLunas(user, { dari: p.dari, sampai: p.sampai }),
     db
       .select({ n: count() })
       .from(polis)
@@ -73,7 +73,7 @@ export default async function Dashboard() {
       <KepalaHalaman jejak={[{ label: "Dashboard" }]} judul={`Halo ${namaDepan},`} sorot="selamat bekerja" sub={`Ringkasan ${p.label}.`} />
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6" data-uji="dashboard">
         <Angka label="Premi bulan ini" nilai={rupiah(t?.premi ?? 0)} href="/laporan" />
-        <Angka label="Polis terbit bulan ini" nilai={angka(t?.polis ?? 0)} sub={`${angka(nNasabah.n)} nasabah ${admin ? "terdaftar" : "Anda"}`} href="/polis" />
+        <Angka label="Polis lunas bulan ini" nilai={angka(t?.polis ?? 0)} sub={`${angka(nNasabah.n)} nasabah ${admin ? "terdaftar" : "Anda"}`} href="/polis" />
         {admin ? (
           <Angka label="Cashback asuransi bulan ini" nilai={rupiah(t?.cashbackTotal ?? 0)} sub={`Kantor ${rupiah(t?.bagianKantor ?? 0)}`} href="/laporan" />
         ) : (

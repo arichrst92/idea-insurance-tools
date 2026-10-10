@@ -5,7 +5,7 @@ import { db } from "@/db";
 import { exportJobs, kasKantor, polis, users } from "@/db/schema";
 import { cekTokenCetak } from "@/lib/ekspor/token";
 import { JENIS_EKSPOR, type JenisEkspor } from "@/lib/ekspor/antrian";
-import { agregasi, polisTerbit, renewal, ringkasKlaim, total, type FilterLaporan } from "@/lib/laporan";
+import { agregasi, polisLunas, renewal, ringkasKlaim, total, type FilterLaporan } from "@/lib/laporan";
 import { KATEGORI_KAS, arusKasBulanan, posisiKas, saldoKas, type KategoriKas } from "@/lib/keuangan";
 import { daftarPengajuan } from "@/lib/daftar-pengajuan";
 import { svgBar, WARNA } from "@/lib/chart";
@@ -112,10 +112,10 @@ const Judul = ({ children }: { children: ReactNode }) => <h2 className="mb-2 mt-
 async function Laporan({ user, f }: { user: typeof users.$inferSelect; f: FilterLaporan }) {
   const admin = user.role === "admin";
   const awal6 = geserBulan(f.sampai.slice(0, 8) + "01", -5);
-  const [rows, rows6, ren, kl] = await Promise.all([polisTerbit(user, f), polisTerbit(user, { ...f, dari: awal6 < f.dari ? awal6 : f.dari }), renewal(user, f), ringkasKlaim(user, f)]);
+  const [rows, rows6, ren, kl] = await Promise.all([polisLunas(user, f), polisLunas(user, { ...f, dari: awal6 < f.dari ? awal6 : f.dari }), renewal(user, f), ringkasKlaim(user, f)]);
   const t = total(rows, admin);
   const bulan = Array.from({ length: 6 }, (_, i) => geserBulan(awal6, i));
-  const perBulan = agregasi(rows6, (r) => [r.tglTerbit.slice(0, 7), r.tglTerbit.slice(0, 7)], admin);
+  const perBulan = agregasi(rows6, (r) => [r.tglLunas.slice(0, 7), r.tglLunas.slice(0, 7)], admin);
   const svg = svgBar({
     kategori: bulan.map((b) => namaBulanId(b).slice(0, 3)),
     seri: [{ nama: "Premi", data: bulan.map((b) => perBulan.find((x) => x.kunci === b.slice(0, 7))?.premi ?? 0), warna: WARNA.brand }],
@@ -136,7 +136,7 @@ async function Laporan({ user, f }: { user: typeof users.$inferSelect; f: Filter
   return (
     <>
       <div className="grid grid-cols-4 gap-2">
-        <Kotak label="Polis terbit" nilai={angka(t?.polis ?? 0)} sub={`${rows.filter((r) => !r.perpanjangan).length} baru · ${rows.filter((r) => r.perpanjangan).length} perpanjangan`} />
+        <Kotak label="Polis lunas" nilai={angka(t?.polis ?? 0)} sub={`${rows.filter((r) => !r.perpanjangan).length} baru · ${rows.filter((r) => r.perpanjangan).length} perpanjangan`} />
         <Kotak label="Premi" nilai={rupiah(t?.premi ?? 0)} />
         {admin ? <Kotak label="Cashback asuransi" nilai={rupiah(t?.cashbackTotal ?? 0)} sub={`Kantor ${rupiah(t?.bagianKantor ?? 0)}`} /> : <Kotak label="Cashback nasabah" nilai={rupiah(t?.cashbackNasabah ?? 0)} />}
         <Kotak label={admin ? "Komisi sales" : "Komisi Anda"} nilai={rupiah(t?.komisi ?? 0)} sub={t?.komisiEvent ? `bonus event ${rupiah(t.komisiEvent)}` : undefined} />
@@ -155,8 +155,8 @@ async function Laporan({ user, f }: { user: typeof users.$inferSelect; f: Filter
       )}
       <Judul>Detail polis ({rows.length})</Judul>
       <Tabel
-        kepala={["Terbit", "No. polis", "Nasabah", ...(admin ? ["Sales"] : []), "Asuransi", "Premi", admin ? "Komisi" : "Komisi Anda"]}
-        baris={rows.map((r) => [r.tglTerbit, r.noPolis ?? r.kode, `${r.nasabah} · ${r.plat}`, ...(admin ? [r.sales] : []), `${r.asuransi} ${r.paket}`, rupiah(r.premi), rupiah(r.komisi)])}
+        kepala={["Lunas", "No. polis", "Nasabah", ...(admin ? ["Sales"] : []), "Asuransi", "Premi", admin ? "Komisi" : "Komisi Anda"]}
+        baris={rows.map((r) => [r.tglLunas, r.noPolis ?? r.kode, `${r.nasabah} · ${r.plat}`, ...(admin ? [r.sales] : []), `${r.asuransi} ${r.paket}`, rupiah(r.premi), rupiah(r.komisi)])}
         kanan={admin ? [5, 6] : [4, 5]}
       />
     </>

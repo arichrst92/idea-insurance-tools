@@ -1,8 +1,8 @@
 import { wajibLogin } from "@/lib/auth/session";
 import { Kartu, KepalaHalaman } from "@/components/ui";
 import { Angka, FilterPeriode, TabelBar, type Kolom } from "@/components/laporan";
-import { filterDari, rasio, type SP } from "./util";
-import { agregasi, pilihanFilter, polisTerbit, renewal, ringkasKlaim, total, type Agregat } from "@/lib/laporan";
+import { filterDari, type SP } from "./util";
+import { agregasi, belumLunas, pilihanFilter, polisLunas, renewal, ringkasKlaim, total, type Agregat } from "@/lib/laporan";
 import { angka, persen, rupiah } from "@/lib/format";
 import { TombolPdf } from "@/components/tombol-ekspor";
 import { ChartSvg } from "@/components/chart-svg";
@@ -20,14 +20,15 @@ export default async function HalamanLaporan({ searchParams }: { searchParams: P
 
   const awal6 = geserBulan(f.sampai.slice(0, 8) + "01", -5);
   const [rows, rows6, ren, kl, pilihan] = await Promise.all([
-    polisTerbit(user, f),
-    polisTerbit(user, { ...f, dari: awal6 < f.dari ? awal6 : f.dari }),
+    polisLunas(user, f),
+    polisLunas(user, { ...f, dari: awal6 < f.dari ? awal6 : f.dari }),
     renewal(user, f),
     ringkasKlaim(user, f),
     pilihanFilter(admin),
   ]);
+  const bl = await belumLunas(user, f);
   const bulan6 = Array.from({ length: 6 }, (_, i) => geserBulan(awal6, i));
-  const premi6 = agregasi(rows6, (r) => [r.tglTerbit.slice(0, 7), r.tglTerbit.slice(0, 7)], admin);
+  const premi6 = agregasi(rows6, (r) => [r.tglLunas.slice(0, 7), r.tglLunas.slice(0, 7)], admin);
   const svgPremi = svgBar({
     kategori: bulan6.map((b) => namaBulanId(b).slice(0, 3)),
     seri: [{ nama: "Premi", data: bulan6.map((b) => premi6.find((x) => x.kunci === b.slice(0, 7))?.premi ?? 0), warna: WARNA.brand }],
@@ -39,7 +40,7 @@ export default async function HalamanLaporan({ searchParams }: { searchParams: P
   const perSales = agregasi(rows, (r) => [r.salesId, r.sales], admin);
   const perAsuransi = agregasi(rows, (r) => [r.asuransi, r.asuransi], admin);
   const perPaket = agregasi(rows, (r) => [`${r.asuransi} · ${r.paket}`, `${r.asuransi} · ${r.paket}`], admin);
-  const perBulan = agregasi(rows, (r) => [r.tglTerbit.slice(0, 7), r.tglTerbit.slice(0, 7)], admin).sort((a, b) => a.kunci.localeCompare(b.kunci));
+  const perBulan = agregasi(rows, (r) => [r.tglLunas.slice(0, 7), r.tglLunas.slice(0, 7)], admin).sort((a, b) => a.kunci.localeCompare(b.kunci));
   const baru = rows.filter((r) => !r.perpanjangan).length;
   const qs = new URLSearchParams(Object.entries(sp).filter(([, v]) => v) as [string, string][]).toString();
 
@@ -60,7 +61,7 @@ export default async function HalamanLaporan({ searchParams }: { searchParams: P
         jejak={[{ label: "Laporan" }]}
         judul="Laporan"
         sorot={admin ? "penjualan" : "saya"}
-        sub="Penjualan dihitung pada tanggal polis terbit. Pengajuan batal atau salah input tidak terhitung."
+        sub="Penjualan dihitung pada tanggal lunas (premi sudah dibayar nasabah) — acuan yang sama untuk target & gaji sales. Polis terbit yang belum dibayar belum terhitung."
         aksi={
           <>
             <a href={`/api/laporan/excel?${qs}`} download className="inline-flex h-10 items-center rounded-full border border-line-2 bg-white px-5 text-sm font-semibold hover:border-ink-4">
@@ -73,7 +74,7 @@ export default async function HalamanLaporan({ searchParams }: { searchParams: P
       <FilterPeriode aksi="/laporan" p={p} nilai={sp} pilihan={pilihan} />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4" data-uji="ringkasan-laporan">
-        <Angka label="Polis terbit" nilai={angka(t?.polis ?? 0)} sub={`${baru} baru · ${(t?.polis ?? 0) - baru} perpanjangan`} />
+        <Angka label="Polis lunas" nilai={angka(t?.polis ?? 0)} sub={`${baru} baru · ${(t?.polis ?? 0) - baru} perpanjangan`} />
         <Angka label="Premi" nilai={rupiah(t?.premi ?? 0)} />
         {admin ? (
           <Angka label="Cashback asuransi" nilai={rupiah(t?.cashbackTotal ?? 0)} sub={`Kantor ${rupiah(t?.bagianKantor ?? 0)}`} />
@@ -90,7 +91,7 @@ export default async function HalamanLaporan({ searchParams }: { searchParams: P
         />
         <Angka label="Klaim" nilai={angka(kl.total)} sub={`${kl.diproses} diproses · ${kl.selesai} selesai · ${kl.ditolak} ditolak`} href="/klaim?tab=semua" />
         <Angka label="Rata-rata premi" nilai={rupiah(t ? Math.round(t.premi / t.polis) : 0)} />
-        <Angka label="Lunas" nilai={persen(rasio(rows.filter((r) => r.lunas).length, rows.length))} sub={`${rows.filter((r) => !r.lunas).length} polis belum dibayar`} />
+        <Angka label="Belum lunas" nilai={rupiah(bl.premi)} sub={`${bl.n} polis terbit menunggu pembayaran — belum dihitung`} href="/pengajuan?tab=giliran" nada={bl.n ? "warn" : undefined} />
       </div>
 
       <Kartu className="flex flex-col gap-2" data-uji="chart-premi">

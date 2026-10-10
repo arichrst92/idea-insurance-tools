@@ -7,14 +7,18 @@ import { rasio } from "@/lib/domain/periode";
 
 /**
  * Definisi laporan:
- * - Penjualan dihitung pada tanggal POLIS TERBIT (WIB), premi = premi bruto.
- *   Pengajuan batal/ditolak/salah input tidak pernah terbit sehingga tidak terhitung.
+ * - Penjualan (dan target/gaji sales) dihitung pada TANGGAL LUNAS: polis baru terhitung setelah
+ *   nasabah membayar; premi = premi bruto. Polis terbit yang belum dibayar = "belum lunas" (belum dihitung).
+ *   Pengajuan batal/ditolak/salah input tidak pernah lunas sehingga tidak terhitung.
  * - Komisi & cashback mengikuti angka yang disalin ke polis saat disetujui.
  * - Renewal rate: polis yang jatuh tempo di periode (kendaraan masih dipakai) → berapa yang sudah diperpanjang.
  * - Sales hanya melihat polisnya sendiri dan tidak pernah menerima cashback asuransi / bagian kantor.
  */
 
-export const tglTerbitSql = sql<string>`(select to_char(min(sh.waktu) at time zone 'Asia/Jakarta', 'YYYY-MM-DD') from status_history sh where sh.polis_id = ${polis.id} and sh.status = 'polis_terbit')`;
+/** Tanggal acuan penjualan: tanggal lunas (tanggal bayar nasabah). */
+export const tglLunasSql = sql<string>`to_char(${polis.tglBayar}, 'YYYY-MM-DD')`;
+/** Polis yang sudah lunas (premi dibayar nasabah). */
+export const sudahLunas = sql`${polis.statusBayar} = 'lunas' and ${polis.tglBayar} is not null`;
 
 export type FilterLaporan = {
   dari: string;
@@ -28,7 +32,7 @@ export type BarisPolis = {
   id: string;
   kode: string;
   noPolis: string | null;
-  tglTerbit: string;
+  tglLunas: string;
   nasabah: string;
   plat: string;
   salesId: string;
@@ -66,13 +70,13 @@ function lingkup(user: User, f: FilterLaporan): SQL | undefined {
   );
 }
 
-/** Polis terbit dalam periode (detail per baris). */
-export async function polisTerbit(user: User, f: FilterLaporan): Promise<BarisPolis[]> {
+/** Polis yang lunas dalam periode (detail per baris). */
+export async function polisLunas(user: User, f: FilterLaporan): Promise<BarisPolis[]> {
   const admin = user.role === "admin";
   const rows = await db
     .select({
       p: polis,
-      tglTerbit: tglTerbitSql,
+      tglLunas: tglLunasSql,
       nasabah: nasabah.nama,
       plat: kendaraan.noPolisi,
       sales: users.nama,
@@ -87,17 +91,17 @@ export async function polisTerbit(user: User, f: FilterLaporan): Promise<BarisPo
     .leftJoin(kategoriPolis, eq(kategoriPolis.id, polis.kategoriId))
     .where(
       and(
-        inArray(polis.statusPengajuan, [...STATUS_TERBIT]),
+        sudahLunas,
         lingkup(user, f),
-        sql`${tglTerbitSql} between ${f.dari} and ${f.sampai}`,
+        sql`${polis.tglBayar} between ${f.dari} and ${f.sampai}`,
       ),
     )
-    .orderBy(tglTerbitSql, polis.kode);
+    .orderBy(tglLunasSql, polis.kode);
   return rows.map((r) => ({
     id: r.p.id,
     kode: r.p.kode,
     noPolis: r.p.noPolis,
-    tglTerbit: r.tglTerbit,
+    tglLunas: r.tglLunas,
     nasabah: r.nasabah,
     plat: r.plat,
     salesId: r.p.salesId,
@@ -198,6 +202,15 @@ export async function ringkasKlaim(user: User, f: FilterLaporan) {
     ditolak: rows.filter((r) => r.status === "ditolak").length,
     perAsuransi: [...perAsuransi.entries()].map(([asuransi, x]) => ({ asuransi, ...x })),
   };
+}
+
+/** Polis sudah terbit tetapi belum dibayar nasabah (belum dihitung ke penjualan/target). */
+export async function belumLunas(user: User, f: FilterLaporan) {
+  const [r] = await db
+    .select({ n: sql<number>`count(*)`.mapWith(Number), premi: sql<number>`coalesce(sum(${polis.premiBruto}), 0)`.mapWith(Number) })
+    .from(polis)
+    .where(and(inArray(polis.statusPengajuan, ["polis_terbit", "menunggu_bayar"]), lingkup(user, f)));
+  return r;
 }
 
 /** Pilihan filter (sales, asuransi, paket). */
