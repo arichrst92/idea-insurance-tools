@@ -57,30 +57,6 @@ const TEMPLATE_WA = [
   },
 ];
 
-// Paket coverage bawaan (bisa diubah di Master data → Paket coverage).
-const DASAR = "Tabrakan, benturan, terperosok, tergelincir, kehilangan, kebakaran, pencurian";
-const PAKET = [
-  { nama: "Biasa", urutan: 1, cakupan: [DASAR, "Tuntutan pihak ke-3"] },
-  {
-    nama: "Plus",
-    urutan: 2,
-    cakupan: [DASAR, "Banjir, badai, angin topan, hujan es, tanah longsor", "Kerusuhan, huru-hara", "Tuntutan pihak ke-3"],
-  },
-  {
-    nama: "Complete",
-    urutan: 3,
-    cakupan: [
-      DASAR,
-      "Banjir, badai, angin topan, hujan es, tanah longsor",
-      "Gempa bumi, tsunami, letusan gunung berapi",
-      "Kerusuhan, huru-hara",
-      "Terorisme, sabotase",
-      "Tuntutan pihak ke-3",
-      "Personal accident sopir & 4 penumpang",
-    ],
-  },
-];
-
 const OTOMASI = [
   { kode: "draft_perpanjangan", nama: "Draft perpanjangan", jadwalCron: "0 6 * * *", parameter: { hariSebelum: 45 } },
   { kode: "alert_mandek", nama: "Alert pengajuan mandek", jadwalCron: "0 8 * * *", parameter: { hari: 3, hariCepat: 2, eskalasiAdmin: 7 } },
@@ -105,11 +81,6 @@ async function main() {
 
   for (const t of TEMPLATE_WA) await db.insert(schema.waTemplate).values(t).onConflictDoNothing();
   console.log(`✓ ${TEMPLATE_WA.length} template WhatsApp`);
-
-  const adaPaket = await db.select({ nama: schema.kategoriPolis.nama }).from(schema.kategoriPolis);
-  const baru = PAKET.filter((p) => !adaPaket.some((a) => a.nama.toLowerCase() === p.nama.toLowerCase()));
-  if (baru.length) await db.insert(schema.kategoriPolis).values(baru);
-  console.log(`✓ paket coverage (${baru.length} baru)`);
 
   for (const o of OTOMASI) await db.insert(schema.otomasiSetting).values(o).onConflictDoNothing();
   console.log(`✓ ${OTOMASI.length} pengaturan otomasi`);

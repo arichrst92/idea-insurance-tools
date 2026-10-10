@@ -41,10 +41,10 @@ export default async function Dashboard() {
           <ol className="flex flex-col gap-2 text-sm text-ink-2">
             <li>
               1. Isi <Link className="font-semibold text-brand" href="/master/asuransi">perusahaan asuransi</Link> beserta
-              email underwriting dan WhatsApp PIC.
+              email underwriting, WhatsApp PIC, dan paket coverage-nya (Biasa, Plus, Complete).
             </li>
             <li>
-              2. Periksa <Link className="font-semibold text-brand" href="/master/kategori">paket coverage</Link> (Biasa, Plus, Complete) dan tambahkan{" "}
+              2. Tambahkan{" "}
               <Link className="font-semibold text-brand" href="/master/bengkel">bengkel</Link>.
             </li>
             <li>

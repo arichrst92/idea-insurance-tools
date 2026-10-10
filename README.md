@@ -36,7 +36,7 @@ Dengan `OTP_BYPASS=1` (bawaan `.env.example`) login cukup dengan nomor terdaftar
 | `npm run typecheck` / `npm run lint` | Pemeriksaan kode |
 | `npm run db:generate` | Buat file migrasi setelah mengubah `src/db/schema.ts` |
 | `npm run db:migrate` | Terapkan migrasi |
-| `npm run db:seed` | Admin pertama, paket coverage Biasa/Plus/Complete, template WA, pengaturan otomasi (aman diulang) |
+| `npm run db:seed` | Admin pertama, template WA, pengaturan otomasi (aman diulang) |
 | `npm run db:studio` | Lihat isi database di browser |
 
 ## Deploy ke VPS
@@ -56,7 +56,7 @@ src/
   app/
     login/            Login OTP WhatsApp
     (app)/            Halaman setelah login (dock menu bawah)
-      master/         Asuransi + kontak PIC, paket coverage (Biasa/Plus/Complete), bengkel, rekening kantor
+      master/         Asuransi + kontak PIC + paket coverage per asuransi, bengkel, rekening kantor
       sales/          Pengguna & sales (fulltime/freelance, target, gaji, bagi hasil, rekening)
       nasabah/        Nasabah, kendaraan, dokumen, rekening cashback
       pengajuan/      Journey 12 langkah, kirim ke asuransi, penawaran, polis, pembayaran

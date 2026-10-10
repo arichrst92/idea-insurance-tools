@@ -224,11 +224,14 @@ export const kontakAsuransi = pgTable("kontak_asuransi", {
 });
 
 /**
- * Paket coverage (mis. Biasa, Plus, Complete) — berlaku untuk semua asuransi.
+ * Paket coverage milik satu perusahaan asuransi (mis. MNC: Biasa, Plus, Complete).
  * Premi tiap paket tidak dihitung sistem; dicatat dari penawaran asuransi.
  */
 export const kategoriPolis = pgTable("kategori_polis", {
   id: id(),
+  perusahaanId: text()
+    .notNull()
+    .references(() => perusahaanAsuransi.id, { onDelete: "cascade" }),
   nama: text().notNull(),
   /** Daftar risiko yang dijamin, satu baris per item */
   cakupan: text().array().notNull().default(sql`'{}'`),

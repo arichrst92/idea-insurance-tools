@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
 import {
@@ -96,7 +96,6 @@ export async function buatPengajuan(_: StateForm, f: FormData): Promise<StateFor
 
   const nilai = teks(f, "nilaiPertanggungan") ? parseRupiah(teks(f, "nilaiPertanggungan")) : null;
   if (nilai !== null && (Number.isNaN(nilai) || nilai <= 0)) return { error: "Nilai pertanggungan tidak valid" };
-  const kategoriId = opsional(f, "kategoriId");
 
   const id = await db.transaction(async (tx) => {
     const kode = await kodeBaru(tx);
@@ -107,7 +106,6 @@ export async function buatPengajuan(_: StateForm, f: FormData): Promise<StateFor
         nasabahId: n.id,
         kendaraanId: k.id,
         salesId: n.salesId,
-        kategoriId,
         nilaiPertanggungan: nilai,
         polisSebelumnyaId: opsional(f, "polisSebelumnyaId"),
       })
@@ -129,7 +127,7 @@ export async function ubahDataPengajuan(id: string, _: StateForm, f: FormData): 
   if (nilai !== null && (Number.isNaN(nilai) || nilai <= 0)) return { error: "Nilai pertanggungan tidak valid" };
   await db
     .update(polis)
-    .set({ nilaiPertanggungan: nilai, kategoriId: opsional(f, "kategoriId") })
+    .set({ nilaiPertanggungan: nilai })
     .where(eq(polis.id, id));
   segarkan(id);
   return { ok: "Tersimpan" };
@@ -167,11 +165,10 @@ export async function kirimKeAsuransi(id: string, _: StateForm, f: FormData): Pr
   if (kanal.length === 0) return { error: "Pilih kanal: email dan/atau WhatsApp" };
 
   const [b] = await db
-    .select({ n: nasabah, k: kendaraan, kat: kategoriPolis })
+    .select({ n: nasabah, k: kendaraan })
     .from(polis)
     .innerJoin(nasabah, eq(nasabah.id, polis.nasabahId))
     .innerJoin(kendaraan, eq(kendaraan.id, polis.kendaraanId))
-    .leftJoin(kategoriPolis, eq(kategoriPolis.id, polis.kategoriId))
     .where(eq(polis.id, id));
   const docs = await db
     .select()
@@ -191,7 +188,7 @@ export async function kirimKeAsuransi(id: string, _: StateForm, f: FormData): Pr
     ["No. rangka", b.k.noRangka ?? "-"],
     ["No. mesin", b.k.noMesin ?? "-"],
     ["Nilai pertanggungan", rupiah(p.nilaiPertanggungan)],
-    ["Paket diminta", b.kat ? b.kat.nama : "Mohon penawaran untuk semua paket (mis. Biasa, Plus, Complete)"],
+    ["Paket", "Mohon penawaran untuk semua paket yang tersedia (mis. Biasa, Plus, Complete)"],
   ];
   const teksData = baris.map(([k, v]) => `${k}: ${v}`).join("\n");
   const htmlData = `<table cellpadding="6" style="border-collapse:collapse;font-family:Arial,sans-serif;font-size:14px">${baris
@@ -317,7 +314,11 @@ export async function tambahPenawaran(id: string, _: StateForm, f: FormData): Pr
   if (!d.success) return { error: d.error.issues[0]?.message };
 
   // Premi per paket (Biasa/Plus/Complete) sesuai angka dari asuransi; boleh sebagian.
-  const paket = await db.select({ id: kategoriPolis.id, nama: kategoriPolis.nama }).from(kategoriPolis);
+  const paket = await db
+    .select({ id: kategoriPolis.id, nama: kategoriPolis.nama })
+    .from(kategoriPolis)
+    .where(and(eq(kategoriPolis.perusahaanId, d.data.perusahaanId), eq(kategoriPolis.aktif, true)));
+  if (paket.length === 0) return { error: "Asuransi ini belum punya paket coverage. Tambahkan di Master data → Asuransi." };
   const baris: { kategoriId: string; premi: number }[] = [];
   for (const k of paket) {
     const v = teks(f, `premi_${k.id}`);
@@ -338,6 +339,107 @@ export async function tambahPenawaran(id: string, _: StateForm, f: FormData): Pr
     segarkan(id);
     return { ok: `${baris.length} pilihan paket dicatat` };
   });
+}
+
+/** Penawaran hanya boleh diubah/dihapus sebelum nasabah menyetujui salah satunya. */
+const BOLEH_UBAH_PENAWARAN = ["dikirim_ke_asuransi", "survei_kendaraan", "penawaran_masuk"];
+
+async function penawaranMilik(polisId: string, penawaranId: string) {
+  const [pw] = await db
+    .select()
+    .from(penawaran)
+    .where(and(eq(penawaran.id, penawaranId), eq(penawaran.polisId, polisId)));
+  return pw ?? null;
+}
+
+export async function ubahPenawaran(id: string, penawaranId: string, _: StateForm, f: FormData): Promise<StateForm> {
+  const { user } = await wajibLogin("admin");
+  const p = await polisMilik(user, id);
+  if (!BOLEH_UBAH_PENAWARAN.includes(p.statusPengajuan))
+    return { error: "Penawaran sudah disetujui. Batalkan persetujuan dulu untuk mengubahnya." };
+  const pw = await penawaranMilik(id, penawaranId);
+  if (!pw) return { error: "Penawaran tidak ditemukan" };
+  const premi = parseRupiah(teks(f, "premi"));
+  const cb = parsePersen(teks(f, "cashbackTotalPersen"));
+  if (Number.isNaN(premi) || premi <= 0) return { error: "Premi tidak valid" };
+  if (Number.isNaN(cb) || cb < 0 || cb > 100) return { error: "Cashback total harus 0–100%" };
+  const kategoriId = teks(f, "kategoriId") || null;
+  if (kategoriId) {
+    const [k] = await db
+      .select({ id: kategoriPolis.id })
+      .from(kategoriPolis)
+      .where(and(eq(kategoriPolis.id, kategoriId), eq(kategoriPolis.perusahaanId, pw.perusahaanId)));
+    if (!k) return { error: "Paket tidak sesuai dengan asuransinya" };
+  }
+  await db
+    .update(penawaran)
+    .set({ premi, cashbackTotalPersen: cb, kategoriId, catatan: opsional(f, "catatan") })
+    .where(eq(penawaran.id, penawaranId));
+  await catatAudit({ userId: user.id, aksi: "ubah", tabel: "penawaran", recordId: penawaranId, detail: { premi, cb, kategoriId } });
+  segarkan(id);
+  return { ok: "Penawaran diperbarui" };
+}
+
+export async function hapusPenawaran(id: string, penawaranId: string) {
+  const { user } = await wajibLogin("admin");
+  const p = await polisMilik(user, id);
+  if (!BOLEH_UBAH_PENAWARAN.includes(p.statusPengajuan)) return;
+  const pw = await penawaranMilik(id, penawaranId);
+  if (!pw) return;
+  await db.transaction(async (tx) => {
+    await tx.delete(penawaran).where(eq(penawaran.id, penawaranId));
+    const [{ sisa }] = await tx
+      .select({ sisa: sql<number>`count(*)`.mapWith(Number) })
+      .from(penawaran)
+      .where(eq(penawaran.polisId, id));
+    // Penawaran terakhir dihapus → kembali menunggu penawaran (status sebelum "Penawaran masuk").
+    if (sisa === 0 && p.statusPengajuan === "penawaran_masuk") {
+      const [sebelum] = await tx
+        .select({ status: statusHistory.status })
+        .from(statusHistory)
+        .where(and(eq(statusHistory.polisId, id), inArray(statusHistory.status, ["dikirim_ke_asuransi", "survei_kendaraan"])))
+        .orderBy(desc(statusHistory.waktu))
+        .limit(1);
+      const ke = sebelum?.status ?? "dikirim_ke_asuransi";
+      await tx.update(polis).set({ statusPengajuan: ke }).where(eq(polis.id, id));
+      await tx.insert(statusHistory).values({ polisId: id, status: ke, oleh: user.id, catatan: "Semua penawaran dihapus" });
+    }
+  });
+  await catatAudit({ userId: user.id, aksi: "hapus", tabel: "penawaran", recordId: penawaranId, detail: pw });
+  segarkan(id);
+}
+
+/** Batalkan persetujuan nasabah (mis. salah pilih paket): kembali ke "Penawaran masuk", komisi dihapus. */
+export async function batalkanPersetujuan(id: string, _: StateForm, f: FormData): Promise<StateForm> {
+  const { user } = await wajibLogin();
+  const p = await polisMilik(user, id);
+  if (p.statusPengajuan !== "disetujui_nasabah") return { error: "Hanya bisa sebelum polis terbit" };
+  const alasan = teks(f, "alasan");
+  if (alasan.length < 3) return { error: "Isi alasan pembatalan" };
+  await db.transaction(async (tx) => {
+    await tx.update(penawaran).set({ dipilih: false }).where(eq(penawaran.polisId, id));
+    await tx
+      .update(polis)
+      .set({
+        statusPengajuan: "penawaran_masuk",
+        perusahaanId: null,
+        kategoriId: null,
+        premiBruto: null,
+        cashbackTotalPersen: null,
+        cashbackTotalRp: null,
+        cashbackNasabahPersen: null,
+        cashbackNasabahRp: null,
+        eventId: null,
+        bagiHasilKantorPersen: null,
+        bagianKantorRp: null,
+        komisiSalesRp: null,
+      })
+      .where(eq(polis.id, id));
+    await tx.insert(statusHistory).values({ polisId: id, status: "penawaran_masuk", oleh: user.id, catatan: `Persetujuan dibatalkan: ${alasan}` });
+  });
+  await catatAudit({ userId: user.id, aksi: "batal_setuju", tabel: "polis", recordId: id, detail: { alasan } });
+  segarkan(id);
+  return { ok: "Persetujuan dibatalkan; pilih ulang penawaran" };
 }
 
 // ─── 6. Disetujui nasabah: pilih penawaran + cashback nasabah → hitung komisi ───

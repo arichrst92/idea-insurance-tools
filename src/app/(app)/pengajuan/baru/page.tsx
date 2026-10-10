@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { and, asc, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { kategoriPolis, kendaraan, nasabah } from "@/db/schema";
+import { kendaraan, nasabah } from "@/db/schema";
 import { wajibLogin } from "@/lib/auth/session";
 import { filterNasabah } from "@/lib/akses";
 import { FormAksi } from "@/components/form-aksi";
@@ -63,14 +63,11 @@ export default async function PengajuanBaru({ searchParams }: { searchParams: Pr
     );
   }
 
-  const [daftarKendaraan, kategori] = await Promise.all([
-    db
-      .select()
-      .from(kendaraan)
-      .where(and(eq(kendaraan.nasabahId, terpilih.id), eq(kendaraan.status, "aktif")))
-      .orderBy(asc(kendaraan.dibuat)),
-    db.select().from(kategoriPolis).where(eq(kategoriPolis.aktif, true)).orderBy(asc(kategoriPolis.urutan)),
-  ]);
+  const daftarKendaraan = await db
+    .select()
+    .from(kendaraan)
+    .where(and(eq(kendaraan.nasabahId, terpilih.id), eq(kendaraan.status, "aktif")))
+    .orderBy(asc(kendaraan.dibuat));
 
   return (
     <>
@@ -108,31 +105,15 @@ export default async function PengajuanBaru({ searchParams }: { searchParams: Pr
                 </label>
               ))}
             </fieldset>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Isian label="Nilai pertanggungan (Rp)" name="nilaiPertanggungan" inputMode="numeric" placeholder="185.000.000" required />
-            </div>
-            {kategori.length > 0 && (
-              <fieldset className="flex flex-col gap-2">
-                <legend className="mb-2 text-[13px] font-semibold text-ink-2">Paket yang diminati (opsional)</legend>
-                <div className="grid gap-2 sm:grid-cols-4">
-                  <label className="flex cursor-pointer items-center gap-2 rounded-2xl border border-line p-3 text-sm has-[:checked]:border-ink has-[:checked]:ring-1 has-[:checked]:ring-ink">
-                    <input type="radio" name="kategoriId" value="" defaultChecked className="accent-ink" />
-                    Semua paket
-                  </label>
-                  {kategori.map((k) => (
-                    <label
-                      key={k.id}
-                      title={k.cakupan.join("\n")}
-                      className="flex cursor-pointer items-center gap-2 rounded-2xl border border-line p-3 text-sm has-[:checked]:border-ink has-[:checked]:ring-1 has-[:checked]:ring-ink"
-                    >
-                      <input type="radio" name="kategoriId" value={k.id} className="accent-ink" />
-                      <b>{k.nama}</b>
-                    </label>
-                  ))}
-                </div>
-                <span className="text-xs text-ink-3">Asuransi akan diminta penawaran untuk paket ini; pilih &ldquo;Semua paket&rdquo; bila nasabah belum memutuskan.</span>
-              </fieldset>
-            )}
+            <Isian
+              label="Nilai pertanggungan (Rp)"
+              name="nilaiPertanggungan"
+              inputMode="numeric"
+              placeholder="415.000.000"
+              hint="Asuransi akan diminta penawaran untuk semua paketnya (mis. Biasa, Plus, Complete)."
+              required
+              className="max-w-sm"
+            />
             <p className="text-[13px] text-ink-3">
               Setelah dibuat, pastikan KTP, STNK, dan foto kendaraan 4 sisi sudah diupload, lalu tekan <b>Ajukan ke admin</b>.
             </p>

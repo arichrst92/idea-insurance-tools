@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { and, eq, ne } from "drizzle-orm";
+import { and, eq, ne, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
 import { bengkel, kategoriPolis, kontakAsuransi, perusahaanAsuransi, rekening } from "@/db/schema";
@@ -10,6 +10,7 @@ import { wajibLogin } from "@/lib/auth/session";
 import { catatAudit } from "@/lib/audit";
 import { normalisasiNoWa } from "@/lib/wa";
 import { pelanggaranUnik } from "@/db/errors";
+import { PAKET_STANDAR } from "@/lib/domain/paket";
 import type { StateForm } from "@/components/form-aksi";
 
 const teks = (form: FormData, k: string) => String(form.get(k) ?? "").trim();
@@ -116,11 +117,10 @@ export async function hapusKontak(perusahaanId: string, kontakId: string) {
   revalidatePath(`/master/asuransi/${perusahaanId}`);
 }
 
-// ─── Paket coverage (Biasa / Plus / Complete) ───
+// ─── Paket coverage per asuransi (mis. Biasa / Plus / Complete) ───
 
-export async function simpanPaket(id: string | null, _: StateForm, form: FormData): Promise<StateForm> {
-  const { user } = await wajibLogin("admin");
-  const p = z
+function bacaPaket(form: FormData) {
+  return z
     .object({
       nama: z.string().min(2, "Nama paket wajib diisi").max(40),
       cakupan: z.array(z.string()).min(1, "Isi minimal satu risiko yang dijamin"),
@@ -134,24 +134,68 @@ export async function simpanPaket(id: string | null, _: StateForm, form: FormDat
         .filter(Boolean),
       urutan: Number(teks(form, "urutan") || 0),
     });
+}
+
+export async function simpanPaket(perusahaanId: string, id: string | null, _: StateForm, form: FormData): Promise<StateForm> {
+  const { user } = await wajibLogin("admin");
+  const p = bacaPaket(form);
   if (!p.success) return { error: p.error.issues[0]?.message };
 
-  const sama = await db.select({ id: kategoriPolis.id, nama: kategoriPolis.nama }).from(kategoriPolis);
-  if (sama.some((k) => k.id !== id && k.nama.toLowerCase() === p.data.nama.toLowerCase()))
-    return { error: `Paket "${p.data.nama}" sudah ada` };
+  const ada = await db
+    .select({ id: kategoriPolis.id, nama: kategoriPolis.nama })
+    .from(kategoriPolis)
+    .where(eq(kategoriPolis.perusahaanId, perusahaanId));
+  if (ada.some((k) => k.id !== id && k.nama.toLowerCase() === p.data.nama.toLowerCase()))
+    return { error: `Paket "${p.data.nama}" sudah ada di asuransi ini` };
 
   let recordId = id;
-  if (id) await db.update(kategoriPolis).set(p.data).where(eq(kategoriPolis.id, id));
-  else [{ id: recordId }] = await db.insert(kategoriPolis).values(p.data).returning({ id: kategoriPolis.id });
+  if (id) {
+    await db
+      .update(kategoriPolis)
+      .set(p.data)
+      .where(and(eq(kategoriPolis.id, id), eq(kategoriPolis.perusahaanId, perusahaanId)));
+  } else {
+    [{ id: recordId }] = await db
+      .insert(kategoriPolis)
+      .values({ ...p.data, perusahaanId })
+      .returning({ id: kategoriPolis.id });
+  }
   await catatAudit({ userId: user.id, aksi: id ? "ubah" : "tambah", tabel: "kategori_polis", recordId, detail: p.data });
-  revalidatePath("/master/kategori");
+  revalidatePath(`/master/asuransi/${perusahaanId}`);
   return { ok: id ? "Paket tersimpan" : "Paket ditambahkan" };
 }
 
-export async function ubahAktifKategori(id: string, aktif: boolean) {
+/** Isi paket Biasa/Plus/Complete standar untuk asuransi yang belum punya paket dengan nama itu. */
+export async function tambahPaketStandar(perusahaanId: string) {
+  const { user } = await wajibLogin("admin");
+  const ada = await db.select({ nama: kategoriPolis.nama }).from(kategoriPolis).where(eq(kategoriPolis.perusahaanId, perusahaanId));
+  const baru = PAKET_STANDAR.filter((p) => !ada.some((a) => a.nama.toLowerCase() === p.nama.toLowerCase()));
+  if (baru.length) await db.insert(kategoriPolis).values(baru.map((p) => ({ ...p, perusahaanId })));
+  await catatAudit({ userId: user.id, aksi: "paket_standar", tabel: "kategori_polis", recordId: perusahaanId, detail: { jumlah: baru.length } });
+  revalidatePath(`/master/asuransi/${perusahaanId}`);
+}
+
+/** Hapus paket bila belum pernah dipakai di penawaran/polis; bila sudah, nonaktifkan saja. */
+export async function hapusPaket(perusahaanId: string, id: string) {
+  const { user } = await wajibLogin("admin");
+  const [{ n }] = await db.execute<{ n: string }>(
+    sql`select (select count(*) from penawaran where kategori_id = ${id}) + (select count(*) from polis where kategori_id = ${id}) as n`,
+  );
+  const dipakai = Number(n);
+  const kondisi = and(eq(kategoriPolis.id, id), eq(kategoriPolis.perusahaanId, perusahaanId));
+  if (dipakai > 0) await db.update(kategoriPolis).set({ aktif: false }).where(kondisi);
+  else await db.delete(kategoriPolis).where(kondisi);
+  await catatAudit({ userId: user.id, aksi: dipakai > 0 ? "nonaktifkan" : "hapus", tabel: "kategori_polis", recordId: id });
+  revalidatePath(`/master/asuransi/${perusahaanId}`);
+}
+
+export async function ubahAktifKategori(perusahaanId: string, id: string, aktif: boolean) {
   await wajibLogin("admin");
-  await db.update(kategoriPolis).set({ aktif }).where(eq(kategoriPolis.id, id));
-  revalidatePath("/master/kategori");
+  await db
+    .update(kategoriPolis)
+    .set({ aktif })
+    .where(and(eq(kategoriPolis.id, id), eq(kategoriPolis.perusahaanId, perusahaanId)));
+  revalidatePath(`/master/asuransi/${perusahaanId}`);
 }
 
 // ─── Bengkel ───

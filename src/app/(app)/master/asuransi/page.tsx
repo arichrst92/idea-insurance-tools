@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { asc } from "drizzle-orm";
 import { db } from "@/db";
-import { kontakAsuransi, perusahaanAsuransi } from "@/db/schema";
+import { kategoriPolis, kontakAsuransi, perusahaanAsuransi } from "@/db/schema";
 import { TabMaster } from "@/app/(app)/master/tab-master";
 import { Kartu, KepalaHalaman, Kosong, Lencana, TautanTombol } from "@/components/ui";
 import { formatNoWa } from "@/lib/wa";
@@ -9,9 +9,10 @@ import { formatNoWa } from "@/lib/wa";
 export const metadata = { title: "Master asuransi" };
 
 export default async function DaftarAsuransi() {
-  const [daftar, kontak] = await Promise.all([
+  const [daftar, kontak, paket] = await Promise.all([
     db.select().from(perusahaanAsuransi).orderBy(asc(perusahaanAsuransi.nama)),
     db.select().from(kontakAsuransi),
+    db.select().from(kategoriPolis).orderBy(asc(kategoriPolis.urutan)),
   ]);
 
   return (
@@ -20,7 +21,7 @@ export default async function DaftarAsuransi() {
         jejak={[{ label: "Master data", href: "/master" }, { label: "Asuransi" }]}
         judul="Perusahaan"
         sorot="asuransi"
-        sub="Email underwriting dan WhatsApp PIC dipakai untuk mengirim data pengajuan."
+        sub="Email underwriting dan WhatsApp PIC dipakai untuk mengirim data pengajuan; paket coverage diatur per asuransi."
         aksi={<TautanTombol href="/master/asuransi/baru">Tambah asuransi</TautanTombol>}
       />
       <TabMaster />
@@ -59,6 +60,20 @@ export default async function DaftarAsuransi() {
                   ) : (
                     <p className="text-[13px] text-ink-3">Belum ada kontak PIC.</p>
                   )}
+                  {(() => {
+                    const pk = paket.filter((x) => x.perusahaanId === a.id && x.aktif);
+                    return pk.length ? (
+                      <div className="flex flex-wrap gap-1">
+                        {pk.map((x) => (
+                          <Lencana key={x.id} nada="brand">
+                            {x.nama.toUpperCase()}
+                          </Lencana>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-[13px] text-warn">Belum ada paket coverage.</p>
+                    );
+                  })()}
                 </Kartu>
               </Link>
             );
