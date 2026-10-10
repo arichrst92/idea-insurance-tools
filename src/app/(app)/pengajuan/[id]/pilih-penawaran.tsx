@@ -2,68 +2,50 @@
 
 import { useState } from "react";
 import { FormAksi, type StateForm } from "@/components/form-aksi";
-import { hitungKomisi } from "@/lib/domain/komisi";
-import { rupiah, persen } from "@/lib/format";
 import { RincianKomisi } from "@/components/rincian-komisi";
+import { rupiah, persen } from "@/lib/format";
+import { LANGKAH_CB, type OpsiPenawaran } from "./opsi-penawaran";
 
-type Opsi = {
-  id: string;
-  asuransi: string;
-  paket: string | null;
-  cakupan: string[];
-  premi: number;
-  cashbackTotalPersen: number;
-};
+const snap = (v: number, batas: number) => Math.min(batas, Math.max(0, Math.round(v / LANGKAH_CB) * LANGKAH_CB));
 
-/** Pilih paket dari penawaran asuransi + atur cashback ke nasabah, dengan simulasi komisi langsung. */
+/**
+ * Pilih paket dari penawaran asuransi + atur cashback ke nasabah, dengan simulasi komisi langsung.
+ * Untuk sales, browser hanya menerima tabel komisi per cashback nasabah (kelipatan 0,5%) — tanpa
+ * cashback dari asuransi maupun bagian kantor.
+ */
 export function PilihPenawaran({
   aksi,
   opsi,
-  maksCashback,
-  bagiHasilKantor,
-  bagiHasilKantorNormal,
+  admin,
+  kantor,
   namaEvent,
   tambahanEvent,
   pilihanNasabahId,
 }: {
   aksi: (s: StateForm, f: FormData) => Promise<StateForm>;
-  opsi: Opsi[];
-  maksCashback: number;
-  bagiHasilKantor: number;
-  bagiHasilKantorNormal: number;
+  opsi: OpsiPenawaran[];
+  admin: boolean;
+  /** Hanya untuk admin: % kantor berlaku & normal */
+  kantor?: { berlaku: number; normal: number };
   namaEvent: string | null;
   tambahanEvent: number;
   pilihanNasabahId: string | null;
 }) {
   const [pilih, setPilih] = useState(opsi.find((x) => x.id === pilihanNasabahId)?.id ?? opsi[0]?.id);
-  const [cb, setCb] = useState(Math.min(15, maksCashback));
   const o = opsi.find((x) => x.id === pilih);
-  const batas = o ? Math.min(maksCashback, o.cashbackTotalPersen) : maksCashback;
+  const batas = o?.batas ?? 0;
+  const [cbMentah, setCb] = useState(15);
+  const cb = snap(cbMentah, batas);
+  const t = o?.tabel.find((x) => x.cb === cb) ?? null;
   const perAsuransi = [...new Set(opsi.map((x) => x.asuransi))];
-
-  let hasil: ReturnType<typeof hitungKomisi> | null = null;
-  let galat: string | null = null;
-  if (o) {
-    try {
-      hasil = hitungKomisi({
-        premiBruto: o.premi,
-        cashbackTotalPersen: o.cashbackTotalPersen,
-        cashbackNasabahPersen: cb,
-        maksCashbackNasabahPersen: maksCashback,
-        bagiHasilKantorPersen: bagiHasilKantor,
-        bagiHasilKantorNormalPersen: bagiHasilKantorNormal,
-      });
-    } catch (e) {
-      galat = (e as Error).message;
-    }
-  }
 
   return (
     <FormAksi aksi={aksi} tombol="Nasabah setuju" className="flex flex-col gap-4">
       {perAsuransi.map((a) => (
         <fieldset key={a} className="flex flex-col gap-2">
           <legend className="mb-2 text-[13px] font-semibold text-ink-2">
-            {a} · cashback total {persen(opsi.find((x) => x.asuransi === a)?.cashbackTotalPersen)}
+            {a}
+            {admin && ` · cashback total ${persen(opsi.find((x) => x.asuransi === a)?.cashbackTotalPersen)}`}
           </legend>
           <div className="grid gap-2 sm:grid-cols-3">
             {opsi
@@ -99,54 +81,69 @@ export function PilihPenawaran({
       )}
 
       <label className="flex flex-col gap-1.5 text-[13px] font-semibold text-ink-2">
-        Cashback ke nasabah (% premi) — maks {persen(batas)}
+        Cashback untuk nasabah (% premi) — maks {persen(batas)} untuk penawaran ini
         <div className="flex items-center gap-3">
           <input
             type="range"
             min={0}
             max={batas}
-            step={0.5}
-            value={Math.min(cb, batas)}
+            step={LANGKAH_CB}
+            value={cb}
             onChange={(e) => setCb(Number(e.target.value))}
             className="flex-1 accent-brand"
-            aria-label="Cashback ke nasabah"
+            aria-label="Cashback untuk nasabah"
           />
           <input
-            name="cashbackNasabahPersen"
+            type="number"
+            min={0}
+            max={batas}
+            step={LANGKAH_CB}
             inputMode="decimal"
-            value={String(cb)}
-            onChange={(e) => setCb(Number(e.target.value.replace(",", ".")) || 0)}
+            value={cb}
+            onChange={(e) => setCb(Number(e.target.value) || 0)}
             className="h-10 w-20 rounded-xl border border-line-2 px-3 text-right text-[15px] text-ink"
+            aria-label="Persen cashback untuk nasabah"
           />
           <span className="text-ink-3">%</span>
         </div>
+        <input type="hidden" name="cashbackNasabahPersen" value={String(cb)} />
+        <span className="text-[12px] font-normal text-ink-3">Makin besar cashback untuk nasabah, makin kecil komisi Anda.</span>
       </label>
 
-      {galat && <p className="text-sm text-bad">{galat}</p>}
-      {hasil && o && (
+      {t && o && (
         <div className="rounded-2xl bg-ink p-4 text-white">
           <p className="mb-2 text-[11px] font-semibold tracking-[0.08em] text-[#A9B0C2]">
-            RINGKASAN · KANTOR {persen(bagiHasilKantor)} / SALES {persen(100 - bagiHasilKantor)}
+            RINGKASAN
+            {admin && kantor && ` · KANTOR ${persen(kantor.berlaku)} / SALES ${persen(100 - kantor.berlaku)}`}
             {namaEvent && ` · EVENT ${namaEvent.toUpperCase()} +${persen(tambahanEvent)}`}
           </p>
           <dl className="grid grid-cols-2 gap-y-1 text-sm">
             <dt className="text-[#A9B0C2]">Dibayar nasabah ({o.paket})</dt>
             <dd className="text-right font-semibold">{rupiah(o.premi)}</dd>
-            <dt className="text-[#A9B0C2]">Cashback total</dt>
-            <dd className="text-right">{rupiah(hasil.cashbackTotalRp)}</dd>
-            <dt className="text-[#A9B0C2]">Cashback ke nasabah</dt>
-            <dd className="text-right">{rupiah(hasil.cashbackNasabahRp)}</dd>
-            <dt className="text-[#A9B0C2]">Bagian kantor</dt>
-            <dd className="text-right">{rupiah(hasil.bagianKantorRp)}</dd>
+            {admin && t.totalRp != null && (
+              <>
+                <dt className="text-[#A9B0C2]">Cashback total</dt>
+                <dd className="text-right">{rupiah(t.totalRp)}</dd>
+              </>
+            )}
+            <dt className="text-[#A9B0C2]">Cashback untuk nasabah</dt>
+            <dd className="text-right">{rupiah(t.nasabahRp)}</dd>
+            {admin && t.kantorRp != null && (
+              <>
+                <dt className="text-[#A9B0C2]">Bagian kantor</dt>
+                <dd className="text-right">{rupiah(t.kantorRp)}</dd>
+              </>
+            )}
           </dl>
           <div className="mt-3 border-t border-[#232A3B] pt-3">
             <RincianKomisi
               gelap
-              total={hasil.komisiSalesRp}
-              event={hasil.komisiEventRp}
+              untukSales={!admin}
+              total={t.komisi}
+              event={t.event}
               namaEvent={namaEvent}
               tambahanPersen={tambahanEvent}
-              porsiSalesNormal={100 - bagiHasilKantorNormal}
+              porsiSalesNormal={admin && kantor ? 100 - kantor.normal : null}
             />
           </div>
         </div>

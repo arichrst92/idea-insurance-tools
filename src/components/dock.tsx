@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import { aksiLogout } from "@/app/login/actions";
 import clsx from "clsx";
 import {
   LayoutGrid,
@@ -21,6 +23,7 @@ import {
   Database,
   UserCog,
   Sparkles,
+  LogOut,
   type LucideIcon,
 } from "lucide-react";
 
@@ -48,7 +51,7 @@ const ITEMS: Item[] = [
   { href: "/sales", label: "Sales", ikon: UserCog, admin: true },
 ];
 
-export function Dock({ role }: { role: "admin" | "sales" }) {
+export function Dock({ role, nama }: { role: "admin" | "sales"; nama: string }) {
   const path = usePathname();
   const aktif = (href: string) => (href === "/" ? path === "/" : path === href || path.startsWith(href + "/"));
   const umum = ITEMS.filter((i) => !i.admin);
@@ -56,18 +59,80 @@ export function Dock({ role }: { role: "admin" | "sales" }) {
 
   return (
     <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex justify-center px-3 pb-3">
-      <nav
-        aria-label="Menu utama"
-        className="dock-scroll pointer-events-auto flex max-w-full items-end gap-1 overflow-x-auto overscroll-x-contain rounded-[26px] border border-line bg-white/85 px-3 pb-1.5 pt-2.5 shadow-[0_16px_40px_rgba(43,89,240,0.12),0_2px_6px_rgba(11,15,26,0.06)] backdrop-blur-xl"
+      <div className="pointer-events-auto flex max-w-full items-end rounded-[26px] border border-line bg-white/85 shadow-[0_16px_40px_rgba(43,89,240,0.12),0_2px_6px_rgba(11,15,26,0.06)] backdrop-blur-xl">
+        <nav aria-label="Menu utama" className="dock-scroll flex min-w-0 items-end gap-1 overflow-x-auto overscroll-x-contain pb-1.5 pl-3 pr-1 pt-2.5">
+          {umum.map((i) => (
+            <DockItem key={i.href} item={i} aktif={aktif(i.href)} />
+          ))}
+          {admin.length > 0 && <span aria-hidden className="mx-1.5 mb-5 mt-1 w-px shrink-0 self-stretch bg-[#E0E3EC]" />}
+          {admin.map((i) => (
+            <DockItem key={i.href} item={i} aktif={aktif(i.href)} />
+          ))}
+        </nav>
+        <span aria-hidden className="mb-5 mt-3 w-px shrink-0 self-stretch bg-[#E0E3EC]" />
+        <Akun nama={nama} role={role} />
+      </div>
+    </div>
+  );
+}
+
+/** Akun & keluar: selalu terlihat di ujung kanan dock (tidak ikut tergulir). */
+function Akun({ nama, role }: { nama: string; role: "admin" | "sales" }) {
+  const [buka, setBuka] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!buka) return;
+    const tutup = (e: MouseEvent | KeyboardEvent) => {
+      if (e instanceof KeyboardEvent ? e.key === "Escape" : !ref.current?.contains(e.target as Node)) setBuka(false);
+    };
+    document.addEventListener("mousedown", tutup);
+    document.addEventListener("keydown", tutup);
+    return () => {
+      document.removeEventListener("mousedown", tutup);
+      document.removeEventListener("keydown", tutup);
+    };
+  }, [buka]);
+  const inisial = nama
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((k) => k[0])
+    .join("")
+    .toUpperCase();
+  const depan = nama.split(/\s+/)[0];
+
+  return (
+    <div ref={ref} className="relative shrink-0 pb-1.5 pl-1 pr-3 pt-2.5">
+      <button
+        type="button"
+        onClick={() => setBuka((b) => !b)}
+        aria-expanded={buka}
+        aria-haspopup="menu"
+        aria-label={`Akun ${nama}`}
+        className="dock-item flex min-w-[62px] flex-col items-center gap-1 px-0.5"
       >
-        {umum.map((i) => (
-          <DockItem key={i.href} item={i} aktif={aktif(i.href)} />
-        ))}
-        {admin.length > 0 && <span aria-hidden className="mx-1.5 mb-5 mt-1 w-px shrink-0 self-stretch bg-[#E0E3EC]" />}
-        {admin.map((i) => (
-          <DockItem key={i.href} item={i} aktif={aktif(i.href)} />
-        ))}
-      </nav>
+        <span className="dock-tile flex size-[46px] items-center justify-center rounded-full border border-brand-edge bg-brand-soft text-[13px] font-extrabold text-brand-ink">
+          {inisial}
+        </span>
+        <span className="max-w-[64px] truncate whitespace-nowrap text-[11px] font-medium text-ink-2">{depan}</span>
+        <span aria-hidden className="size-1" />
+      </button>
+      {buka && (
+        <div role="menu" className="absolute bottom-full right-2 mb-3 w-60 rounded-2xl border border-line bg-white p-2 shadow-[0_16px_40px_rgba(11,15,26,0.14)]">
+          <div className="flex items-center gap-3 px-2 py-2">
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-brand-soft text-[12px] font-bold text-brand-ink">{inisial}</span>
+            <span className="min-w-0">
+              <span className="block truncate text-sm font-bold">{nama}</span>
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-3">{role}</span>
+            </span>
+          </div>
+          <form action={aksiLogout} className="border-t border-line pt-1.5">
+            <button role="menuitem" className="flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-sm font-semibold text-bad hover:bg-bad-soft">
+              <LogOut size={16} aria-hidden />
+              Keluar
+            </button>
+          </form>
+        </div>
+      )}
     </div>
   );
 }

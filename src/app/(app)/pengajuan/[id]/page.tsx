@@ -32,6 +32,8 @@ import { bagiHasilBerlaku } from "@/lib/domain/komisi";
 import { persen, rupiah } from "@/lib/format";
 import { cekKelengkapan, trackerAktif, urlTracker, MIN_FOTO_KENDARAAN } from "@/lib/pengajuan";
 import { PilihPenawaran } from "./pilih-penawaran";
+import { siapkanOpsi } from "./opsi-penawaran";
+import { DOK_KHUSUS_ADMIN } from "@/lib/akses";
 import { RincianKomisi } from "@/components/rincian-komisi";
 import { MASA_PERLU_DIURUS, STATUS_TERBIT, perpanjanganDari } from "@/lib/perpanjangan";
 import { sisaHari, waktuWib } from "@/lib/domain/perpanjangan";
@@ -76,6 +78,12 @@ function InputFile({ label, name, wajib = false, pdf = false }: { label: string;
       <input type="file" name={name} required={wajib} accept={pdf ? "application/pdf" : "image/*,application/pdf"} className={kelasFile} />
     </label>
   );
+}
+
+/** Catatan riwayat versi sales: nominal pencairan dari asuransi tidak ditampilkan. */
+function catatanUntuk(status: StatusPengajuan, catatan: string, admin: boolean) {
+  if (admin || status !== "cashback_cair") return catatan;
+  return catatan.replace(/\s*Rp\s?[\d.]+/g, "").replace(/^Cair\b/, "Dana asuransi cair");
 }
 
 export default async function DetailPengajuan({ params }: { params: Promise<{ id: string }> }) {
@@ -182,6 +190,8 @@ export default async function DetailPengajuan({ params }: { params: Promise<{ id
   for (const r of riwayat) waktuLangkah.set(r.h.status, r.h.waktu);
   const ditutup = s === "selesai" || s === "ditolak_asuransi" || s === "batal_nasabah";
   const sebelumTerbit = (n ?? 0) < 7;
+  // Dokumen yang memuat angka dari asuransi (file penawaran, bukti pencairan) hanya untuk admin.
+  const dokTerlihat = admin ? dokPolis : dokPolis.filter((d) => !DOK_KHUSUS_ADMIN.includes(d.jenis));
   const buktiNasabah = dokPolis.filter((d) => d.jenis === "bukti_bayar_nasabah" && !d.diuploadOleh);
   const bolehUbahPenawaran = ["dikirim_ke_asuransi", "survei_kendaraan", "penawaran_masuk"].includes(s);
 
@@ -311,17 +321,19 @@ export default async function DetailPengajuan({ params }: { params: Promise<{ id
         </p>
         <PilihPenawaran
           aksi={setujuiPenawaran.bind(null, id)}
-          opsi={daftarPenawaran.map(({ pw, asuransi, paket, cakupan }) => ({
-            id: pw.id,
-            asuransi,
-            paket,
-            cakupan: cakupan ?? [],
-            premi: pw.premi,
-            cashbackTotalPersen: pw.cashbackTotalPersen,
-          }))}
-          maksCashback={info.sales.maksCashbackNasabahPersen}
-          bagiHasilKantor={bh.persen}
-          bagiHasilKantorNormal={info.sales.bagiHasilKantorPersen}
+          opsi={siapkanOpsi(
+            daftarPenawaran.map(({ pw, asuransi, paket, cakupan }) => ({
+              id: pw.id,
+              asuransi,
+              paket,
+              cakupan: cakupan ?? [],
+              premi: pw.premi,
+              cashbackTotalPersen: pw.cashbackTotalPersen,
+            })),
+            { admin, maksCashback: info.sales.maksCashbackNasabahPersen, kantorBerlaku: bh.persen, kantorNormal: info.sales.bagiHasilKantorPersen },
+          )}
+          admin={admin}
+          kantor={admin ? { berlaku: bh.persen, normal: info.sales.bagiHasilKantorPersen } : undefined}
           namaEvent={namaEvent}
           tambahanEvent={bh.tambahan}
           pilihanNasabahId={p.pilihanNasabahId}
@@ -486,13 +498,13 @@ export default async function DetailPengajuan({ params }: { params: Promise<{ id
             </FormAksi>
           </div>,
         );
-    } else tunggu(`Menunggu admin: ${s === "lunas" ? "setor premi ke asuransi" : s === "premi_disetor" ? "pencairan cashback dari asuransi" : "transfer komisi"}.`);
+    } else tunggu(`Menunggu admin: ${s === "lunas" ? "setor premi ke asuransi" : s === "premi_disetor" ? "pencairan dana dari asuransi" : "transfer komisi"}.`);
   }
 
-  if (s === "selesai") tunggu("Selesai: cashback nasabah dan komisi sales sudah ditransfer.");
+  if (s === "selesai") tunggu(`Selesai: cashback nasabah dan ${admin ? "komisi sales" : "komisi Anda"} sudah ditransfer.`);
   if (s === "ditolak_asuransi" || s === "batal_nasabah") {
     const akhir = riwayat.at(-1);
-    tunggu(`${labelStatus(s)}${akhir?.h.catatan ? ` — ${akhir.h.catatan}` : ""}`);
+    tunggu(`${labelStatus(s)}${akhir?.h.catatan ? ` — ${catatanUntuk(akhir.h.status, akhir.h.catatan, admin)}` : ""}`);
   }
 
   // Tindakan cabang
@@ -549,6 +561,7 @@ export default async function DetailPengajuan({ params }: { params: Promise<{ id
                       <b>{asuransi}</b> {paket && <span className="font-semibold text-brand-ink">· {paket}</span>}{" "}
                       {pw.dipilih && <Lencana nada="ok">DIPILIH</Lencana>}
                       {!pw.dipilih && pw.id === p.pilihanNasabahId && <Lencana nada="ok">PILIHAN NASABAH</Lencana>}
+                      {admin && (
                       <span className="block text-[13px] text-ink-3">
                         cashback {persen(pw.cashbackTotalPersen)}
                         {pw.catatan && ` · ${pw.catatan}`}
@@ -561,6 +574,7 @@ export default async function DetailPengajuan({ params }: { params: Promise<{ id
                           </>
                         )}
                       </span>
+                      )}
                     </span>
                     <span className="font-bold">{rupiah(pw.premi)}</span>
                     </div>
@@ -584,7 +598,7 @@ export default async function DetailPengajuan({ params }: { params: Promise<{ id
                                 <Isian label="Premi (Rp)" name="premi" inputMode="numeric" defaultValue={String(pw.premi)} required />
                                 <Isian label="Cashback total (%)" name="cashbackTotalPersen" inputMode="decimal" defaultValue={String(pw.cashbackTotalPersen)} required />
                               </div>
-                              <Isian label="Catatan" name="catatan" defaultValue={pw.catatan ?? ""} />
+                              <Isian label="Catatan internal (tidak terlihat sales)" name="catatan" defaultValue={pw.catatan ?? ""} />
                             </FormAksi>
                           </div>
                         </details>
@@ -631,11 +645,15 @@ export default async function DetailPengajuan({ params }: { params: Promise<{ id
               <dl className="grid grid-cols-2 gap-y-1.5 text-sm">
                 <dt className="text-[#A9B0C2]">Premi bruto</dt>
                 <dd className="text-right text-base font-bold">{rupiah(p.premiBruto)}</dd>
-                <dt className="text-[#A9B0C2]">Cashback total ({persen(p.cashbackTotalPersen)})</dt>
-                <dd className="text-right">{rupiah(p.cashbackTotalRp)}</dd>
-                <dt className="text-[#A9B0C2]">Ke nasabah ({persen(p.cashbackNasabahPersen)})</dt>
+                {admin && (
+                  <>
+                    <dt className="text-[#A9B0C2]">Cashback total ({persen(p.cashbackTotalPersen)})</dt>
+                    <dd className="text-right">{rupiah(p.cashbackTotalRp)}</dd>
+                  </>
+                )}
+                <dt className="text-[#A9B0C2]">Cashback untuk nasabah ({persen(p.cashbackNasabahPersen)})</dt>
                 <dd className="text-right">{rupiah(p.cashbackNasabahRp)}</dd>
-                {p.bagianKantorRp != null && (
+                {admin && p.bagianKantorRp != null && (
                   <>
                     <dt className="text-[#A9B0C2]">
                       Bagian kantor ({persen(p.bagiHasilKantorPersen)}
@@ -649,11 +667,12 @@ export default async function DetailPengajuan({ params }: { params: Promise<{ id
                 <div className="border-t border-[#232A3B] pt-3">
                   <RincianKomisi
                     gelap
+                    untukSales={!admin}
                     total={p.komisiSalesRp}
                     event={p.komisiEventRp ?? 0}
                     namaEvent={info.ev?.nama}
                     tambahanPersen={info.ev?.tambahanKomisiPersen}
-                    porsiSalesNormal={p.bagiHasilKantorNormalPersen != null ? 100 - p.bagiHasilKantorNormalPersen : null}
+                    porsiSalesNormal={admin && p.bagiHasilKantorNormalPersen != null ? 100 - p.bagiHasilKantorNormalPersen : null}
                   />
                 </div>
               )}
@@ -798,9 +817,10 @@ export default async function DetailPengajuan({ params }: { params: Promise<{ id
               )}
               {p.tglCairAsuransi && (
                 <>
-                  <dt className="text-ink-3">Cashback cair</dt>
+                  <dt className="text-ink-3">Dana asuransi cair</dt>
                   <dd>
-                    {tgl(p.tglCairAsuransi)} · {rupiah(p.nominalCairAsuransi)}
+                    {tgl(p.tglCairAsuransi)}
+                    {admin && ` · ${rupiah(p.nominalCairAsuransi)}`}
                   </dd>
                 </>
               )}
@@ -812,14 +832,14 @@ export default async function DetailPengajuan({ params }: { params: Promise<{ id
               )}
               {p.tglTransferSales && (
                 <>
-                  <dt className="text-ink-3">Komisi sales</dt>
+                  <dt className="text-ink-3">{admin ? "Komisi sales" : "Komisi Anda"}</dt>
                   <dd>{tgl(p.tglTransferSales)}</dd>
                 </>
               )}
             </dl>
-            {dokPolis.length > 0 && (
+            {dokTerlihat.length > 0 && (
               <ul className="flex flex-wrap gap-2 border-t border-line pt-3">
-                {dokPolis.map((d) => (
+                {dokTerlihat.map((d) => (
                   <li key={d.id}>
                     <a
                       href={`/api/dokumen/${d.id}`}
@@ -881,7 +901,7 @@ export default async function DetailPengajuan({ params }: { params: Promise<{ id
                   <span>
                     <b>{labelStatus(h.status)}</b> · {tglJam(h.waktu)} · {oleh ?? "Sistem"}
                   </span>
-                  {h.catatan && <span className="text-ink-3">{h.catatan}</span>}
+                  {h.catatan && <span className="text-ink-3">{catatanUntuk(h.status, h.catatan, admin)}</span>}
                 </li>
               ))}
               {kirimLog.map(({ l, asuransi }) => (

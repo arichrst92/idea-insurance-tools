@@ -11,7 +11,7 @@ export const LANGKAH: { status: StatusPengajuan; label: string; oleh: string }[]
   { status: "menunggu_bayar", label: "Menunggu bayar", oleh: "Sales" },
   { status: "lunas", label: "Lunas", oleh: "Sales/Admin" },
   { status: "premi_disetor", label: "Premi disetor", oleh: "Admin" },
-  { status: "cashback_cair", label: "Cashback cair", oleh: "Admin" },
+  { status: "cashback_cair", label: "Dana asuransi cair", oleh: "Admin" },
   { status: "selesai", label: "Selesai", oleh: "Admin" },
 ];
 

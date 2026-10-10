@@ -55,9 +55,9 @@ export function FormPenawaran({ aksi, asuransi }: { aksi: (s: StateForm, f: Form
           </fieldset>
         ))}
 
-      <Isian label="Catatan" name="catatan" placeholder="Mis. used car, TSI Rp 415.000.000, sudah termasuk biaya polis" />
+      <Isian label="Catatan internal (tidak terlihat sales)" name="catatan" placeholder="Mis. used car, TSI Rp 415.000.000, sudah termasuk biaya polis" />
       <label className="flex flex-col gap-1.5 text-[13px] font-semibold text-ink-2">
-        File penawaran dari asuransi (opsional)
+        File penawaran dari asuransi (opsional, hanya admin yang bisa membuka)
         <input
           type="file"
           name="file"

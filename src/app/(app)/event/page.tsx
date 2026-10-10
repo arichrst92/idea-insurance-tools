@@ -8,7 +8,7 @@ import { persen, rupiah } from "@/lib/format";
 import { RincianKomisi } from "@/components/rincian-komisi";
 import { buatEvent, hapusEvent, ubahAktifEvent, ubahEvent } from "./actions";
 
-export const metadata = { title: "Event bagi hasil" };
+export const metadata = { title: "Event" };
 
 const LABEL_BERLAKU = { semua: "Semua sales", fulltime: "Fulltime", freelance: "Freelance", pilihan: "Sales tertentu" };
 
@@ -53,10 +53,14 @@ export default async function HalamanEvent() {
   return (
     <>
       <KepalaHalaman
-        jejak={[{ label: "Event bagi hasil" }]}
+        jejak={[{ label: admin ? "Event bagi hasil" : "Event bonus komisi" }]}
         judul="Event"
-        sorot="bagi hasil"
-        sub="Selama event, porsi komisi sales bertambah dan porsi kantor berkurang sebesar tambahan itu. Bila beberapa event berlaku bersamaan, dipakai tambahan terbesar."
+        sorot={admin ? "bagi hasil" : "bonus komisi"}
+        sub={
+          admin
+            ? "Selama event, porsi komisi sales bertambah dan porsi kantor berkurang sebesar tambahan itu. Bila beberapa event berlaku bersamaan, dipakai tambahan terbesar."
+            : "Selama event berjalan, komisi Anda naik sebesar persen bonusnya untuk setiap polis yang disetujui di periode itu."
+        }
       />
       <div className={admin ? "grid items-start gap-4 lg:grid-cols-[1.5fr_1fr]" : "flex flex-col gap-4"}>
         <div className="flex flex-col gap-3">
@@ -74,7 +78,9 @@ export default async function HalamanEvent() {
                   </div>
                   <div className="flex items-center gap-2">
                     {!e.aktif ? <Lencana>NONAKTIF</Lencana> : berjalan ? <Lencana nada="ok">BERJALAN</Lencana> : e.tglMulai > hariIni ? <Lencana nada="brand">AKAN DATANG</Lencana> : <Lencana>SELESAI</Lencana>}
-                    <span className="rounded-full bg-ink px-3 py-1 text-sm font-extrabold text-white">Komisi sales +{persen(e.tambahanKomisiPersen)}</span>
+                    <span className="rounded-full bg-ink px-3 py-1 text-sm font-extrabold text-white">
+                      {admin ? "Komisi sales" : "Komisi Anda"} +{persen(e.tambahanKomisiPersen)}
+                    </span>
                   </div>
                 </div>
                 <dl className="grid grid-cols-2 gap-2 text-sm">
@@ -89,7 +95,7 @@ export default async function HalamanEvent() {
                 </dl>
                 {jml > 0 && (
                   <div className="rounded-2xl bg-canvas p-3">
-                    <RincianKomisi total={komisi} event={komisiEvent} namaEvent={e.nama} tambahanPersen={e.tambahanKomisiPersen} besar={false} />
+                    <RincianKomisi untukSales={!admin} total={komisi} event={komisiEvent} namaEvent={e.nama} tambahanPersen={e.tambahanKomisiPersen} besar={false} />
                   </div>
                 )}
                 {admin && (

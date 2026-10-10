@@ -13,6 +13,7 @@ export function RincianKomisi({
   porsiSalesNormal,
   gelap = false,
   besar = true,
+  untukSales = false,
 }: {
   total: number;
   event: number;
@@ -22,6 +23,8 @@ export function RincianKomisi({
   porsiSalesNormal?: number | null;
   gelap?: boolean;
   besar?: boolean;
+  /** Bahasa untuk sales: "Komisi Anda", "Komisi reguler", "Bonus event"; tanpa % porsi */
+  untukSales?: boolean;
 }) {
   const dasar = total - event;
   const adaEvent = event > 0;
@@ -33,7 +36,7 @@ export function RincianKomisi({
   return (
     <div className="flex flex-col gap-1.5" data-uji="rincian-komisi">
       <div className="flex items-baseline justify-between gap-3">
-        <span className={`text-sm ${gelap ? "text-[#C9D5FF]" : "font-semibold text-ink-2"}`}>Komisi sales</span>
+        <span className={`text-sm ${gelap ? "text-[#C9D5FF]" : "font-semibold text-ink-2"}`}>{untukSales ? "Komisi Anda" : "Komisi sales"}</span>
         <span className={`${besar ? "text-lg" : "text-base"} font-extrabold ${sorot}`}>{rupiah(total)}</span>
       </div>
       {adaEvent ? (
@@ -45,19 +48,23 @@ export function RincianKomisi({
           <dl className="grid grid-cols-[1fr_auto] gap-x-3 gap-y-0.5 text-[13px]">
             <dt className={redup}>
               <span className={`mr-1.5 inline-block size-2 rounded-full ${gelap ? "bg-[#8FA8FF]" : "bg-brand"}`} />
-              Komisi dasar{porsiSalesNormal != null ? ` (porsi sales ${persen(porsiSalesNormal)})` : ""}
+              {untukSales ? "Komisi reguler" : "Komisi dasar"}
+              {!untukSales && porsiSalesNormal != null ? ` (porsi sales ${persen(porsiSalesNormal)})` : ""}
             </dt>
             <dd className={`text-right font-semibold ${gelap ? "text-white" : "text-ink"}`}>{rupiah(dasar)}</dd>
             <dt className={redup}>
               <span className={`mr-1.5 inline-block size-2 rounded-full ${gelap ? "bg-[#FFD27A]" : "bg-warn"}`} />
-              Tambahan event{namaEvent ? ` ${namaEvent}` : ""}
+              {untukSales ? "Bonus event" : "Tambahan event"}
+              {namaEvent ? ` ${namaEvent}` : ""}
               {tambahanPersen ? ` (+${persen(tambahanPersen)})` : ""} · {persen(pctEvent)} dari komisi
             </dt>
             <dd className={`text-right font-bold ${warnaEvent}`}>+{rupiah(event)}</dd>
           </dl>
         </>
       ) : (
-        <p className={`text-[12px] ${redup}`}>Tanpa event{porsiSalesNormal != null ? ` · porsi sales ${persen(porsiSalesNormal)}` : ""}</p>
+        <p className={`text-[12px] ${redup}`}>
+          Tanpa event{!untukSales && porsiSalesNormal != null ? ` · porsi sales ${persen(porsiSalesNormal)}` : ""}
+        </p>
       )}
     </div>
   );

@@ -49,6 +49,14 @@ docker compose --profile prod run --rm migrate npx tsx scripts/seed.ts   # sekal
 
 Aplikasi listen di `127.0.0.1:3000`; Nginx di host meneruskan `insurance.ide.asia` ke sana dengan SSL (Certbot). Set `client_max_body_size 50m;` di blok server Nginx agar upload beberapa file sekaligus tidak ditolak.
 
+## Kerahasiaan angka asuransi
+
+Sales tidak melihat cashback dari asuransi, bagian kantor, porsi bagi hasil (%), nominal pencairan dari asuransi,
+file penawaran asuransi, maupun catatan internal penawaran — baik di layar maupun di data yang dikirim ke browser.
+Simulasi komisi di form persetujuan dihitung di server (`opsi-penawaran.ts`) dan hanya mengirim tabel komisi per
+pilihan cashback nasabah. Istilah untuk sales: "Komisi Anda", "Komisi reguler", "Bonus event", "Dana asuransi cair".
+Tes e2e `cekBocor` memastikan istilah/angka tersebut tidak muncul di halaman sales.
+
 ## Otomasi & webhook WhatsApp
 
 Otomasi harian berjalan di dalam app (penjadwal per menit, zona WIB) sesuai jadwal di tabel `otomasi_setting`:

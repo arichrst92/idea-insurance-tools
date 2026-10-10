@@ -502,7 +502,10 @@ export async function setujuiPenawaran(id: string, _: StateForm, f: FormData): P
     });
     segarkan(id);
     return {
-      ok: `Disetujui. Komisi sales ${rupiah(k.komisiSalesRp)}${k.komisiEventRp > 0 ? ` (dasar ${rupiah(k.komisiDasarRp)} + event ${rupiah(k.komisiEventRp)})` : ""}`,
+      ok:
+        user.role === "admin"
+          ? `Disetujui. Komisi sales ${rupiah(k.komisiSalesRp)}${k.komisiEventRp > 0 ? ` (dasar ${rupiah(k.komisiDasarRp)} + event ${rupiah(k.komisiEventRp)})` : ""}`
+          : `Disetujui. Komisi Anda ${rupiah(k.komisiSalesRp)}${k.komisiEventRp > 0 ? ` (reguler ${rupiah(k.komisiDasarRp)} + bonus event ${rupiah(k.komisiEventRp)})` : ""}`,
     };
   });
 }
@@ -673,7 +676,7 @@ export async function catatCair(id: string, _: StateForm, f: FormData): Promise<
         polisId: id,
         ke: "cashback_cair",
         oleh: user.id,
-        catatan: `Cair ${tgl} ${rupiah(nominal)}`,
+        catatan: `Dana asuransi cair ${tgl}`,
         patch: { tglCairAsuransi: tgl, nominalCairAsuransi: nominal },
       }),
     );
@@ -690,7 +693,7 @@ export async function catatTransfer(id: string, jenis: "nasabah" | "sales", _: S
   const boleh: StatusPengajuan[] =
     jenis === "nasabah" ? ["lunas", "premi_disetor", "cashback_cair"] : ["cashback_cair"];
   if (!boleh.includes(p.statusPengajuan))
-    return { error: jenis === "nasabah" ? "Cashback nasabah ditransfer setelah premi lunas" : "Komisi ditransfer setelah cashback cair" };
+    return { error: jenis === "nasabah" ? "Cashback nasabah ditransfer setelah premi lunas" : "Komisi ditransfer setelah dana asuransi cair" };
 
   return jalankan(async () => {
     const buktiId = await simpanDokumenPolis(f, "bukti", id, jenis === "nasabah" ? "bukti_transfer_cashback_nasabah" : "bukti_transfer_komisi", user.id);

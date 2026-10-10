@@ -11,6 +11,9 @@ export function filterNasabah(user: User): SQL | undefined {
   return user.role === "admin" ? undefined : eq(nasabah.salesId, user.id);
 }
 
+/** Dokumen polis yang memuat angka dari asuransi (cashback/komisi agen): hanya admin. */
+export const DOK_KHUSUS_ADMIN: string[] = ["penawaran", "bukti_cair_asuransi"];
+
 /** Ambil nasabah bila boleh diakses user; 404 bila tidak ada / bukan miliknya. */
 export async function nasabahMilik(user: User, id: string) {
   const [n] = await db
