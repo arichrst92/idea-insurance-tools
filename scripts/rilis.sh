@@ -13,6 +13,7 @@ cp -r .next/standalone/. "$OUT/"
 mkdir -p "$OUT/.next" && cp -r .next/static "$OUT/.next/static"
 [ -d public ] && cp -r public "$OUT/public"
 cp -r drizzle "$OUT/drizzle"
+cp -r deploy "$OUT/deploy"   # setup-awal.sh, pasang-rilis.sh, systemd, nginx
 
 # Skrip migrasi & seed dibundel jadi satu file (tidak butuh tsx/drizzle-kit di server)
 npx esbuild scripts/migrate.ts --bundle --platform=node --format=esm --target=node20 --outfile="$OUT/migrate.mjs" \
