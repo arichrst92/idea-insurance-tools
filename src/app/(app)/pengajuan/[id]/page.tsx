@@ -142,6 +142,7 @@ export default async function DetailPengajuan({ params }: { params: Promise<{ id
   for (const r of riwayat) waktuLangkah.set(r.h.status, r.h.waktu);
   const ditutup = s === "selesai" || s === "ditolak_asuransi" || s === "batal_nasabah";
   const sebelumTerbit = (n ?? 0) < 7;
+  const buktiNasabah = dokPolis.filter((d) => d.jenis === "bukti_bayar_nasabah" && !d.diuploadOleh);
   const bolehUbahPenawaran = ["dikirim_ke_asuransi", "survei_kendaraan", "penawaran_masuk"].includes(s);
 
   // ─── Panel tindakan sesuai status & peran ───
@@ -262,7 +263,12 @@ export default async function DetailPengajuan({ params }: { params: Promise<{ id
   if (s === "penawaran_masuk") {
     panel.push(
       <div key="setuju" className="rounded-2xl border border-line p-4">
-        <h3 className="mb-3 text-sm font-bold">Persetujuan nasabah</h3>
+        <h3 className="mb-1 text-sm font-bold">Persetujuan nasabah</h3>
+        <p className="mb-3 text-[13px] text-ink-3">
+          {p.pilihanNasabahId
+            ? "Nasabah sudah memilih paket lewat link tracker. Periksa, atur cashback, lalu konfirmasi."
+            : "Nasabah juga bisa memilih sendiri lewat link tracker; pilihannya akan ditandai di sini."}
+        </p>
         <PilihPenawaran
           aksi={setujuiPenawaran.bind(null, id)}
           opsi={daftarPenawaran.map(({ pw, asuransi, paket, cakupan }) => ({
@@ -277,6 +283,7 @@ export default async function DetailPengajuan({ params }: { params: Promise<{ id
           bagiHasilKantor={bh.persen}
           namaEvent={namaEvent}
           tambahanEvent={bh.tambahan}
+          pilihanNasabahId={p.pilihanNasabahId}
         />
       </div>,
     );
@@ -340,12 +347,42 @@ export default async function DetailPengajuan({ params }: { params: Promise<{ id
         <FormAksi aksi={kirimInstruksi.bind(null, id)} tombol={s === "menunggu_bayar" ? "Kirim ulang instruksi" : "Kirim instruksi pembayaran"} varian="kedua">
           <span className="text-[13px] text-ink-3">Dikirim dari WhatsApp kantor dengan PDF polis terlampir; cadangan wa.me bila nomor kantor terputus.</span>
         </FormAksi>
-        <details className="border-t border-line pt-3">
+        {buktiNasabah.length > 0 && (
+          <div className="flex flex-col gap-2 rounded-2xl bg-ok-soft p-3.5">
+            <span className="text-[13px] font-bold text-ok">Bukti transfer dari nasabah ({buktiNasabah.length})</span>
+            <ul className="flex flex-wrap gap-2">
+              {buktiNasabah.map((d) => (
+                <li key={d.id}>
+                  <a
+                    href={`/api/dokumen/${d.id}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    title={`Diupload ${tglJam(d.dibuat)}`}
+                    className="flex size-20 items-center justify-center overflow-hidden rounded-xl border border-line bg-white text-[11px] font-bold text-bad"
+                  >
+                    {d.fileKey.endsWith(".pdf") ? (
+                      "PDF"
+                    ) : (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={`/api/dokumen/${d.id}`} alt="Bukti transfer" className="size-full object-cover" />
+                    )}
+                  </a>
+                </li>
+              ))}
+            </ul>
+            <span className="text-xs text-ok">Cocokkan nominal & rekening tujuan, lalu tandai lunas di bawah.</span>
+          </div>
+        )}
+        <details open={buktiNasabah.length > 0} className="border-t border-line pt-3">
           <summary className="cursor-pointer text-sm font-semibold text-brand">Tandai lunas</summary>
           <div className="pt-3">
             <FormAksi aksi={tandaiLunas.bind(null, id)} tombol="Tandai lunas">
               <Isian label="Tanggal bayar" name="tglBayar" type="date" required defaultValue={hariIni()} className="max-w-[220px]" />
-              <InputFile label="Bukti transfer nasabah" name="bukti" wajib />
+              <InputFile
+                label={buktiNasabah.length ? "Bukti transfer lain (opsional — bukti dari nasabah sudah ada)" : "Bukti transfer nasabah"}
+                name="bukti"
+                wajib={buktiNasabah.length === 0}
+              />
             </FormAksi>
           </div>
         </details>
@@ -449,6 +486,7 @@ export default async function DetailPengajuan({ params }: { params: Promise<{ id
                     <span>
                       <b>{asuransi}</b> {paket && <span className="font-semibold text-brand-ink">· {paket}</span>}{" "}
                       {pw.dipilih && <Lencana nada="ok">DIPILIH</Lencana>}
+                      {!pw.dipilih && pw.id === p.pilihanNasabahId && <Lencana nada="ok">PILIHAN NASABAH</Lencana>}
                       <span className="block text-[13px] text-ink-3">
                         cashback {persen(pw.cashbackTotalPersen)}
                         {pw.catatan && ` · ${pw.catatan}`}

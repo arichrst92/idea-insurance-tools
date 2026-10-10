@@ -3,12 +3,14 @@ import { notFound } from "next/navigation";
 import { and, asc, eq, isNull, sql } from "drizzle-orm";
 import clsx from "clsx";
 import { db } from "@/db";
-import { dokumen, kategoriPolis, kendaraan, nasabah, perusahaanAsuransi, polis, rekening, statusHistory, trackerLink, users } from "@/db/schema";
+import { dokumen, kategoriPolis, kendaraan, nasabah, penawaran, perusahaanAsuransi, polis, rekening, statusHistory, trackerLink, users } from "@/db/schema";
 import { LANGKAH_NASABAH, langkahNasabah, samarkanPlat } from "@/lib/domain/journey";
 import { rupiah } from "@/lib/format";
 import { linkWaMe } from "@/lib/wa";
 import { UMUR_TRACKER_HARI } from "@/lib/pengajuan";
 import { FormUnduh } from "./form-unduh";
+import { FormAksi } from "@/components/form-aksi";
+import { pilihPaketNasabah, uploadBuktiNasabah } from "./aksi-nasabah";
 
 export const metadata: Metadata = { title: "Status pengajuan asuransi", robots: { index: false, follow: false } };
 export const dynamic = "force-dynamic";
@@ -46,6 +48,24 @@ export default async function Tracker({ params }: { params: Promise<{ token: str
     .update(trackerLink)
     .set({ jumlahDilihat: sql`${trackerLink.jumlahDilihat} + 1`, terakhirDilihat: new Date() })
     .where(eq(trackerLink.id, b.t.id));
+
+  const tawaran =
+    b.p.statusPengajuan === "penawaran_masuk"
+      ? await db
+          .select({ id: penawaran.id, premi: penawaran.premi, asuransi: perusahaanAsuransi.nama, paket: kategoriPolis.nama, cakupan: kategoriPolis.cakupan })
+          .from(penawaran)
+          .innerJoin(perusahaanAsuransi, eq(perusahaanAsuransi.id, penawaran.perusahaanId))
+          .leftJoin(kategoriPolis, eq(kategoriPolis.id, penawaran.kategoriId))
+          .where(eq(penawaran.polisId, b.p.id))
+          .orderBy(asc(perusahaanAsuransi.nama), asc(kategoriPolis.urutan), asc(penawaran.premi))
+      : [];
+  const buktiNasabah = await db
+    .select({ id: dokumen.id, dibuat: dokumen.dibuat })
+    .from(dokumen)
+    .where(
+      and(eq(dokumen.pemilikTipe, "polis"), eq(dokumen.pemilikId, b.p.id), eq(dokumen.jenis, "bukti_bayar_nasabah"), isNull(dokumen.diuploadOleh)),
+    )
+    .orderBy(asc(dokumen.dibuat));
 
   const [pdf] = await db
     .select({ id: dokumen.id })
@@ -86,7 +106,53 @@ export default async function Tracker({ params }: { params: Promise<{ token: str
   } else if (langkah <= 2) {
     judul = <>Pengajuan Anda <span className="text-brand">sedang diproses</span></>;
   } else if (langkah === 3) {
-    judul = s === "penawaran_masuk" ? <>Penawaran <span className="text-brand">sudah masuk</span></> : <>Polis Anda <span className="text-brand">sedang diterbitkan</span></>;
+    judul = s === "penawaran_masuk" ? <>Silakan <span className="text-brand">pilih paket</span></> : <>Polis Anda <span className="text-brand">sedang diterbitkan</span></>;
+    if (s === "penawaran_masuk" && tawaran.length > 0) {
+      const perAsuransi = [...new Set(tawaran.map((t) => t.asuransi))];
+      aksi = (
+        <section className="flex flex-col gap-3 rounded-[20px] border border-line bg-white p-[18px]">
+          <div>
+            <h2 className="text-base font-bold">Pilihan paket untuk Anda</h2>
+            <p className="text-[13px] text-ink-3">Premi tahun pertama dari asuransi. Sales akan mengonfirmasi pilihan Anda.</p>
+          </div>
+          <FormAksi aksi={pilihPaketNasabah.bind(null, b.t.token)} tombol="Pilih paket ini" className="flex flex-col gap-3">
+            {perAsuransi.map((a) => (
+              <fieldset key={a} className="flex flex-col gap-2">
+                <legend className="mb-1.5 text-[13px] font-bold text-ink-2">{a}</legend>
+                {tawaran
+                  .filter((t) => t.asuransi === a)
+                  .map((t) => (
+                    <label
+                      key={t.id}
+                      className="flex cursor-pointer flex-col gap-1 rounded-2xl border border-line p-3.5 has-[:checked]:border-ink has-[:checked]:ring-1 has-[:checked]:ring-ink"
+                    >
+                      <span className="flex items-center justify-between gap-2">
+                        <span className="flex items-center gap-2.5">
+                          <input type="radio" name="penawaranId" value={t.id} defaultChecked={t.id === b.p.pilihanNasabahId} required className="accent-ink" />
+                          <b>{t.paket ?? "Penawaran"}</b>
+                        </span>
+                        <span className="whitespace-nowrap font-extrabold">{rupiah(t.premi)}</span>
+                      </span>
+                      {t.cakupan && t.cakupan.length > 0 && (
+                        <ul className="ml-7 list-disc pl-4 text-xs text-ink-3">
+                          {t.cakupan.map((c) => (
+                            <li key={c}>{c}</li>
+                          ))}
+                        </ul>
+                      )}
+                    </label>
+                  ))}
+              </fieldset>
+            ))}
+            {b.p.pilihanNasabahId && (
+              <p className="rounded-xl bg-brand-soft px-3.5 py-2.5 text-[13px] text-brand-ink">
+                Pilihan Anda sudah terkirim{b.p.pilihanNasabahWaktu ? ` (${tgl(b.p.pilihanNasabahWaktu)})` : ""}. Anda masih bisa menggantinya sebelum dikonfirmasi sales.
+              </p>
+            )}
+          </FormAksi>
+        </section>
+      );
+    }
   } else if (langkah <= 5 && b.p.statusBayar !== "lunas") {
     judul = <>Polis Anda <span className="text-brand">sudah terbit</span></>;
     if (b.r && b.p.premiBruto) {
@@ -117,8 +183,38 @@ export default async function Tracker({ params }: { params: Promise<{ token: str
               <span className="whitespace-nowrap font-extrabold text-[#8FA8FF]">{rupiah(b.p.cashbackNasabahRp)}</span>
             </div>
           ) : null}
-          <span className="text-xs text-[#A9B0C2]">Kirim bukti transfer dengan membalas pesan WhatsApp kami.</span>
         </section>
+      );
+      aksi = (
+        <>
+          {aksi}
+          <section className="flex flex-col gap-3 rounded-[20px] border border-line bg-white p-[18px]">
+            <div>
+              <h2 className="text-base font-bold">Sudah transfer?</h2>
+              <p className="text-[13px] text-ink-3">Upload foto atau PDF bukti transfer. Kami akan mengonfirmasi pembayaran Anda.</p>
+            </div>
+            {buktiNasabah.length > 0 && (
+              <p className="rounded-xl bg-ok-soft px-3.5 py-2.5 text-[13px] text-ok">
+                {buktiNasabah.length} bukti transfer terkirim (terakhir {tgl(buktiNasabah.at(-1)!.dibuat)}), sedang dicek.
+              </p>
+            )}
+            <FormAksi
+              aksi={uploadBuktiNasabah.bind(null, b.t.token)}
+              tombol={buktiNasabah.length ? "Kirim bukti lain" : "Kirim bukti transfer"}
+              resetSetelahOk
+              className="flex flex-col gap-3"
+            >
+              <input
+                type="file"
+                name="bukti"
+                required
+                accept="image/jpeg,image/png,image/webp,image/heic,application/pdf"
+                aria-label="Bukti transfer"
+                className="w-full text-sm text-ink-2 file:mr-3 file:h-10 file:rounded-full file:border-0 file:bg-brand-soft file:px-4 file:text-sm file:font-semibold file:text-brand-ink"
+              />
+            </FormAksi>
+          </section>
+        </>
       );
     }
   } else if (langkah === 6) {

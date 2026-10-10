@@ -370,6 +370,10 @@ export const polis = pgTable(
     bagianKantorRp: rupiah(),
     komisiSalesRp: rupiah(),
 
+    /** Paket yang dipilih nasabah sendiri lewat link tracker (dikonfirmasi sales) */
+    pilihanNasabahId: text().references((): AnyPgColumn => penawaran.id, { onDelete: "set null" }),
+    pilihanNasabahWaktu: waktu(),
+
     rekeningPembayaranId: text().references(() => rekening.id),
     batasBayar: tanggal(),
     statusBayar: statusBayarEnum().notNull().default("belum_dibayar"),

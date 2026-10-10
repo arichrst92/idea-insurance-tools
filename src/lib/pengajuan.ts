@@ -173,3 +173,20 @@ export async function varsPesanNasabah(polisId: string) {
   };
 }
 
+
+/** Kabari sales pemilik pengajuan: notifikasi in-app + WhatsApp (mis. ada aksi nasabah di tracker). */
+export async function kabariSales(polisId: string, judul: string, isi: string) {
+  const [b] = await db
+    .select({ p: polis, s: users })
+    .from(polis)
+    .innerJoin(users, eq(users.id, polis.salesId))
+    .where(eq(polis.id, polisId));
+  if (!b) return;
+  await db.insert(notifikasi).values({ userId: b.s.id, jenis: "aksi_nasabah", judul: `${b.p.kode} · ${judul}`, isi, link: `/pengajuan/${polisId}` });
+  try {
+    const link = `${process.env.APP_URL ?? ""}/pengajuan/${polisId}`;
+    await kirimPesan({ ke: b.s.noWa, isi: `${b.p.kode}: ${judul}\n${isi}\n${link}`, jenis: "notifikasi", polisId, userId: b.s.id });
+  } catch (e) {
+    console.error("[kabari sales]", e);
+  }
+}

@@ -43,6 +43,13 @@
       "when": 1791620031418,
       "tag": "0005_paket_per_asuransi",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1791621574708,
+      "tag": "0006_pilihan_nasabah",
+      "breakpoints": true
     }
   ]
 }

@@ -600,7 +600,16 @@ export async function tandaiLunas(id: string, _: StateForm, f: FormData): Promis
   const tgl = teks(f, "tglBayar");
   if (!tgl) return { error: "Isi tanggal bayar" };
   const bukti = f.get("bukti");
-  if (!(bukti instanceof File) || bukti.size === 0) return { error: "Upload bukti transfer nasabah" };
+  const adaFile = bukti instanceof File && bukti.size > 0;
+  if (!adaFile) {
+    // Boleh tanpa upload bila nasabah sudah mengirim bukti lewat link tracker.
+    const [dariNasabah] = await db
+      .select({ id: dokumen.id })
+      .from(dokumen)
+      .where(and(eq(dokumen.pemilikTipe, "polis"), eq(dokumen.pemilikId, id), eq(dokumen.jenis, "bukti_bayar_nasabah")))
+      .limit(1);
+    if (!dariNasabah) return { error: "Upload bukti transfer nasabah" };
+  }
 
   return jalankan(async () => {
     await simpanDokumenPolis(f, "bukti", id, "bukti_bayar_nasabah", user.id);

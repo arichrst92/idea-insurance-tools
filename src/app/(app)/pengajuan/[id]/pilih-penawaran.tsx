@@ -22,6 +22,7 @@ export function PilihPenawaran({
   bagiHasilKantor,
   namaEvent,
   tambahanEvent,
+  pilihanNasabahId,
 }: {
   aksi: (s: StateForm, f: FormData) => Promise<StateForm>;
   opsi: Opsi[];
@@ -29,8 +30,9 @@ export function PilihPenawaran({
   bagiHasilKantor: number;
   namaEvent: string | null;
   tambahanEvent: number;
+  pilihanNasabahId: string | null;
 }) {
-  const [pilih, setPilih] = useState(opsi[0]?.id);
+  const [pilih, setPilih] = useState(opsi.find((x) => x.id === pilihanNasabahId)?.id ?? opsi[0]?.id);
   const [cb, setCb] = useState(Math.min(15, maksCashback));
   const o = opsi.find((x) => x.id === pilih);
   const batas = o ? Math.min(maksCashback, o.cashbackTotalPersen) : maksCashback;
@@ -71,6 +73,9 @@ export function PilihPenawaran({
                     <input type="radio" name="penawaranId" value={x.id} checked={pilih === x.id} onChange={() => setPilih(x.id)} className="accent-ink" />
                     <b>{x.paket ?? "Penawaran"}</b>
                   </span>
+                  {x.id === pilihanNasabahId && (
+                    <span className="self-start rounded-full bg-ok-soft px-2 py-0.5 text-[10px] font-bold tracking-wide text-ok">DIPILIH NASABAH</span>
+                  )}
                   <span className="text-base font-extrabold">{rupiah(x.premi)}</span>
                 </label>
               ))}
