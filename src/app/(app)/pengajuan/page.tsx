@@ -11,7 +11,7 @@ import { rupiah } from "@/lib/format";
 
 export const metadata = { title: "Pengajuan" };
 
-const DITUTUP: StatusPengajuan[] = ["ditolak_asuransi", "batal_nasabah"];
+const DITUTUP: StatusPengajuan[] = ["ditolak_asuransi", "batal_nasabah", "batal_salah_input"];
 const TAB = {
   berjalan: { label: "Berjalan", where: notInArray(polis.statusPengajuan, [...DITUTUP, "selesai"]) },
   giliran: { label: "Giliran saya", where: undefined as SQL | undefined },
@@ -54,7 +54,7 @@ export default async function DaftarPengajuan({
   // Langkah terakhir sebelum bercabang (untuk bar status revisi/ditolak/batal).
   const statusTerakhir = sql<StatusPengajuan | null>`(
     select sh.status from status_history sh
-    where sh.polis_id = ${polis.id} and sh.status not in ('perlu_revisi','ditolak_asuransi','batal_nasabah')
+    where sh.polis_id = ${polis.id} and sh.status not in ('perlu_revisi','ditolak_asuransi','batal_nasabah','batal_salah_input')
     order by sh.waktu desc limit 1)`;
   const diubah = sql<Date>`(select max(sh.waktu) from status_history sh where sh.polis_id = ${polis.id})`.mapWith(
     (v: string) => new Date(v),

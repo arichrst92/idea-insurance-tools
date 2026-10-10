@@ -74,7 +74,7 @@ export default async function Tracker({ params }: { params: Promise<{ token: str
     .limit(1);
 
   const s = b.p.statusPengajuan;
-  const ditutup = s === "ditolak_asuransi" || s === "batal_nasabah";
+  const ditutup = s === "ditolak_asuransi" || s === "batal_nasabah" || s === "batal_salah_input";
   const langkah = langkahNasabah({ status: s, tglTransferNasabah: b.p.tglTransferNasabah });
   const sapa = b.n.tipe === "badan" ? b.n.nama : `Bapak/Ibu ${b.n.nama.split(" ")[0]}`;
   const namaDepanSales = b.s.nama.split(" ")[0];
@@ -102,7 +102,7 @@ export default async function Tracker({ params }: { params: Promise<{ token: str
   let judul: React.ReactNode;
   let aksi: React.ReactNode = null;
   if (ditutup) {
-    judul = <>Pengajuan Anda <span className="text-bad">{s === "batal_nasabah" ? "dibatalkan" : "belum disetujui"}</span></>;
+    judul = <>Pengajuan Anda <span className="text-bad">{s === "ditolak_asuransi" ? "belum disetujui" : "dibatalkan"}</span></>;
   } else if (langkah <= 2) {
     judul = <>Pengajuan Anda <span className="text-brand">sedang diproses</span></>;
   } else if (langkah === 3) {

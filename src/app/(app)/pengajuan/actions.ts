@@ -94,9 +94,6 @@ export async function buatPengajuan(_: StateForm, f: FormData): Promise<StateFor
   const [salesAktif] = await db.select({ aktif: users.aktif }).from(users).where(eq(users.id, n.salesId));
   if (!salesAktif?.aktif) return { error: "Sales pemilik nasabah tidak aktif; pindahkan nasabah dulu" };
 
-  const nilai = teks(f, "nilaiPertanggungan") ? parseRupiah(teks(f, "nilaiPertanggungan")) : null;
-  if (nilai !== null && (Number.isNaN(nilai) || nilai <= 0)) return { error: "Nilai pertanggungan tidak valid" };
-
   const id = await db.transaction(async (tx) => {
     const kode = await kodeBaru(tx);
     const [p] = await tx
@@ -106,7 +103,6 @@ export async function buatPengajuan(_: StateForm, f: FormData): Promise<StateFor
         nasabahId: n.id,
         kendaraanId: k.id,
         salesId: n.salesId,
-        nilaiPertanggungan: nilai,
       })
       .returning({ id: polis.id });
     await tx.insert(statusHistory).values({ polisId: p.id, status: "draft_prospek", oleh: user.id, catatan: "Pengajuan dibuat" });
@@ -117,19 +113,21 @@ export async function buatPengajuan(_: StateForm, f: FormData): Promise<StateFor
   redirect(`/pengajuan/${id}`);
 }
 
-export async function ubahDataPengajuan(id: string, _: StateForm, f: FormData): Promise<StateForm> {
-  const { user } = await wajibLogin();
+/** Langkah 3: nilai pertanggungan (TSI) dicatat admin dari hasil taksiran asuransi. */
+export async function simpanNilaiPertanggungan(id: string, _: StateForm, f: FormData): Promise<StateForm> {
+  const { user } = await wajibLogin("admin");
   const p = await polisMilik(user, id);
-  if (!["draft_prospek", "perlu_revisi", "data_lengkap"].includes(p.statusPengajuan))
-    return { error: "Data hanya bisa diubah sebelum dikirim ke asuransi" };
-  const nilai = teks(f, "nilaiPertanggungan") ? parseRupiah(teks(f, "nilaiPertanggungan")) : null;
-  if (nilai !== null && (Number.isNaN(nilai) || nilai <= 0)) return { error: "Nilai pertanggungan tidak valid" };
+  if (!["dikirim_ke_asuransi", "survei_kendaraan", "penawaran_masuk", "disetujui_nasabah"].includes(p.statusPengajuan))
+    return { error: "Nilai pertanggungan dicatat setelah data dikirim ke asuransi" };
+  const nilai = parseRupiah(teks(f, "nilaiPertanggungan"));
+  if (Number.isNaN(nilai) || nilai <= 0) return { error: "Isi nilai pertanggungan dari asuransi" };
   await db
     .update(polis)
     .set({ nilaiPertanggungan: nilai })
     .where(eq(polis.id, id));
+  await catatAudit({ userId: user.id, aksi: "ubah", tabel: "polis", recordId: id, detail: { nilaiPertanggungan: nilai } });
   segarkan(id);
-  return { ok: "Tersimpan" };
+  return { ok: "Nilai pertanggungan tersimpan" };
 }
 
 // ─── 2. Ajukan (draft → data lengkap) ───
@@ -137,7 +135,6 @@ export async function ubahDataPengajuan(id: string, _: StateForm, f: FormData): 
 export async function ajukan(id: string): Promise<StateForm> {
   const { user } = await wajibLogin();
   const p = await polisMilik(user, id);
-  if (!p.nilaiPertanggungan) return { error: "Isi nilai pertanggungan dulu" };
   const cek = await cekKelengkapan(p);
   if (!cek.lengkap) return { error: `Belum lengkap: ${cek.kurang.join(", ")}. Upload di halaman nasabah.` };
   return jalankan(async () => {
@@ -186,8 +183,7 @@ export async function kirimKeAsuransi(id: string, _: StateForm, f: FormData): Pr
     ["Warna", b.k.warna ?? "-"],
     ["No. rangka", b.k.noRangka ?? "-"],
     ["No. mesin", b.k.noMesin ?? "-"],
-    ["Nilai pertanggungan", rupiah(p.nilaiPertanggungan)],
-    ["Paket", "Mohon penawaran untuk semua paket yang tersedia (mis. Biasa, Plus, Complete)"],
+    ["Permintaan", "Mohon taksiran nilai pertanggungan (TSI) dan penawaran untuk semua paket yang tersedia (mis. Biasa, Plus, Complete)"],
   ];
   const teksData = baris.map(([k, v]) => `${k}: ${v}`).join("\n");
   const htmlData = `<table cellpadding="6" style="border-collapse:collapse;font-family:Arial,sans-serif;font-size:14px">${baris
@@ -522,6 +518,7 @@ export async function terbitkanPolis(id: string, _: StateForm, f: FormData): Pro
   const batasBayar = teks(f, "batasBayar");
   const rekeningId = teks(f, "rekeningPembayaranId");
   if (!noPolis) return { error: "Isi nomor polis" };
+  if (!p.nilaiPertanggungan) return { error: "Isi nilai pertanggungan dari asuransi dulu (langkah 3)" };
   if (!tglMulai || !tglAkhir || tglAkhir <= tglMulai) return { error: "Periode polis tidak valid" };
   if (!batasBayar) return { error: "Isi batas bayar" };
   const [r] = await db
@@ -739,14 +736,30 @@ export async function catatTransfer(id: string, jenis: "nasabah" | "sales", _: S
 
 export async function ubahCabang(id: string, _: StateForm, f: FormData): Promise<StateForm> {
   const { user } = await wajibLogin();
-  await polisMilik(user, id);
+  const p0 = await polisMilik(user, id);
   const ke = teks(f, "ke") as StatusPengajuan;
-  if (!["perlu_revisi", "ditolak_asuransi", "batal_nasabah"].includes(ke)) return { error: "Status tidak valid" };
-  if (user.role !== "admin" && ke !== "batal_nasabah") return { error: "Hanya admin" };
+  if (!["perlu_revisi", "ditolak_asuransi", "batal_nasabah", "batal_salah_input"].includes(ke)) return { error: "Status tidak valid" };
+  if (user.role !== "admin" && ke !== "batal_nasabah" && ke !== "batal_salah_input") return { error: "Hanya admin" };
   const catatan = teks(f, "catatan");
   if (catatan.length < 3) return { error: "Isi alasan / catatan" };
   return jalankan(async () => {
-    await db.transaction((tx) => ubahStatus(tx, { polisId: id, ke, oleh: user.id, catatan }));
+    await db.transaction(async (tx) => {
+      await ubahStatus(tx, {
+        polisId: id,
+        ke,
+        oleh: user.id,
+        catatan: ke === "batal_salah_input" && p0.polisSebelumnyaId ? `${catatan} (tautan perpanjangan ke polis lama dilepas)` : catatan,
+        // Salah input: data komisi dikosongkan, dan tautan ke polis lama dilepas supaya
+        // perpanjangan yang benar bisa dibuat ulang dari polis yang sama.
+        patch:
+          ke === "batal_salah_input"
+            ? { polisSebelumnyaId: null, eventId: null, bagiHasilKantorPersen: null, bagiHasilKantorNormalPersen: null, bagianKantorRp: null, komisiSalesRp: null, komisiEventRp: null }
+            : undefined,
+      });
+      if (ke === "batal_salah_input") {
+        await tx.update(trackerLink).set({ dicabut: new Date() }).where(and(eq(trackerLink.polisId, id), sql`${trackerLink.dicabut} is null`));
+      }
+    });
     await setelahStatus(id, user.id);
     segarkan(id);
     return { ok: `Status: ${labelStatus(ke)}` };

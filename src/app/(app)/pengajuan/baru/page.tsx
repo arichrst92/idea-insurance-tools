@@ -5,7 +5,7 @@ import { kendaraan, nasabah } from "@/db/schema";
 import { wajibLogin } from "@/lib/auth/session";
 import { filterNasabah } from "@/lib/akses";
 import { FormAksi } from "@/components/form-aksi";
-import { Isian, Kartu, KepalaHalaman, Kosong, Pilihan } from "@/components/ui";
+import { Kartu, KepalaHalaman, Kosong, Pilihan } from "@/components/ui";
 import { buatPengajuan } from "../actions";
 
 export const metadata = { title: "Pengajuan baru" };
@@ -105,17 +105,9 @@ export default async function PengajuanBaru({ searchParams }: { searchParams: Pr
                 </label>
               ))}
             </fieldset>
-            <Isian
-              label="Nilai pertanggungan (Rp)"
-              name="nilaiPertanggungan"
-              inputMode="numeric"
-              placeholder="415.000.000"
-              hint="Asuransi akan diminta penawaran untuk semua paketnya (mis. Biasa, Plus, Complete)."
-              required
-              className="max-w-sm"
-            />
             <p className="text-[13px] text-ink-3">
-              Setelah dibuat, pastikan KTP, STNK, dan foto kendaraan 4 sisi sudah diupload, lalu tekan <b>Ajukan ke admin</b>.
+              Setelah dibuat, pastikan KTP, STNK, dan foto kendaraan 4 sisi sudah diupload, lalu tekan <b>Ajukan ke admin</b>. Nilai
+              pertanggungan diisi admin dari taksiran asuransi (langkah 3).
             </p>
           </FormAksi>
         </Kartu>

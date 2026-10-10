@@ -55,6 +55,7 @@ export const STATUS_PENGAJUAN = [
   "perlu_revisi",
   "ditolak_asuransi",
   "batal_nasabah",
+  "batal_salah_input",
 ] as const;
 export const statusPengajuanEnum = pgEnum("status_pengajuan", STATUS_PENGAJUAN);
 

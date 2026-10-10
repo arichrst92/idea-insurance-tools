@@ -127,6 +127,10 @@ describe("journey", () => {
     expect(transisiSah("penawaran_masuk", "perlu_revisi")).toBe(true);
     expect(transisiSah("perlu_revisi", "draft_prospek")).toBe(true);
     expect(transisiSah("selesai", "batal_nasabah")).toBe(false);
+    expect(transisiSah("draft_prospek", "batal_salah_input")).toBe(true);
+    expect(transisiSah("disetujui_nasabah", "batal_salah_input")).toBe(true);
+    expect(transisiSah("polis_terbit", "batal_salah_input")).toBe(false);
+    expect(transisiSah("batal_salah_input", "draft_prospek")).toBe(false);
   });
   it("langkah versi nasabah", () => {
     expect(langkahNasabah({ status: "data_lengkap", tglTransferNasabah: null })).toBe(1);

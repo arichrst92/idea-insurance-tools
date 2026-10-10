@@ -12,7 +12,7 @@ export const STATUS_TERBIT = ["polis_terbit", "menunggu_bayar", "lunas", "premi_
 export const MASA_PERLU_DIURUS = ["aktif", "akan_habis", "expired"] as const;
 /** Draft perpanjangan yang sudah lewat tahap ini dianggap "sedang diproses" → remind otomatis berhenti. */
 const STATUS_DRAFT = ["draft_prospek", "data_lengkap", "perlu_revisi"] as const;
-const STATUS_GAGAL = ["batal_nasabah", "ditolak_asuransi"] as const;
+const STATUS_GAGAL = ["batal_nasabah", "ditolak_asuransi", "batal_salah_input"] as const;
 
 /** Polis lewat masa lebih dari ini tidak lagi ditawari perpanjangan otomatis. */
 export const LEWAT_MAKS_HARI = 30;
@@ -80,7 +80,6 @@ export async function buatDraftPerpanjangan(polisLamaId: string, oleh: string | 
           kendaraanId: b.k.id,
           salesId: b.n.salesId,
           kategoriId: b.p.kategoriId,
-          nilaiPertanggungan: b.p.nilaiPertanggungan,
           polisSebelumnyaId: b.p.id,
         })
         .returning({ id: polis.id, kode: polis.kode });

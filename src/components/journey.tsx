@@ -4,10 +4,11 @@ import { LANGKAH, LABEL_CABANG, nomorLangkah } from "@/lib/domain/journey";
 import { Lencana } from "./ui";
 
 /** Warna lencana status: biru = berjalan, hijau = selesai, kuning = revisi, merah = ditutup. */
-export function nadaStatus(s: StatusPengajuan): "brand" | "ok" | "warn" | "bad" {
+export function nadaStatus(s: StatusPengajuan): "brand" | "ok" | "warn" | "bad" | "netral" {
   if (s === "selesai") return "ok";
   if (s === "perlu_revisi") return "warn";
   if (s === "ditolak_asuransi" || s === "batal_nasabah") return "bad";
+  if (s === "batal_salah_input") return "netral";
   return "brand";
 }
 

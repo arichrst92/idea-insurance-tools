@@ -27,7 +27,7 @@ import { polisMilik } from "@/lib/akses";
 import { FormAksi } from "@/components/form-aksi";
 import { Isian, Kartu, KepalaHalaman, Kosong, Lencana, Pilihan } from "@/components/ui";
 import { BarJourney, LencanaStatus } from "@/components/journey";
-import { LANGKAH, nomorLangkah, labelStatus } from "@/lib/domain/journey";
+import { LANGKAH, STATUS_DITUTUP, nomorLangkah, labelStatus } from "@/lib/domain/journey";
 import { bagiHasilBerlaku } from "@/lib/domain/komisi";
 import { persen, rupiah } from "@/lib/format";
 import { cekKelengkapan, trackerAktif, urlTracker, MIN_FOTO_KENDARAAN } from "@/lib/pengajuan";
@@ -59,7 +59,7 @@ import {
   tandaiLunas,
   terbitkanPolis,
   ubahCabang,
-  ubahDataPengajuan,
+  simpanNilaiPertanggungan,
 } from "../actions";
 
 const hariIni = () => new Date().toISOString().slice(0, 10);
@@ -188,7 +188,7 @@ export default async function DetailPengajuan({ params }: { params: Promise<{ id
   const terakhirLangkah = n ?? Math.max(0, ...riwayat.map((r) => nomorLangkah(r.h.status) ?? 0));
   const waktuLangkah = new Map<StatusPengajuan, Date>();
   for (const r of riwayat) waktuLangkah.set(r.h.status, r.h.waktu);
-  const ditutup = s === "selesai" || s === "ditolak_asuransi" || s === "batal_nasabah";
+  const ditutup = STATUS_DITUTUP.includes(s);
   const sebelumTerbit = (n ?? 0) < 7;
   // Dokumen yang memuat angka dari asuransi (file penawaran, bukti pencairan) hanya untuk admin.
   const dokTerlihat = admin ? dokPolis : dokPolis.filter((d) => !DOK_KHUSUS_ADMIN.includes(d.jenis));
@@ -220,15 +220,6 @@ export default async function DetailPengajuan({ params }: { params: Promise<{ id
             </p>
           )}
         </div>
-        <FormAksi aksi={ubahDataPengajuan.bind(null, id)} tombol="Simpan data" varian="kedua">
-          <Isian
-            label="Nilai pertanggungan (Rp)"
-            name="nilaiPertanggungan"
-            inputMode="numeric"
-            defaultValue={p.nilaiPertanggungan ?? ""}
-            className="max-w-sm"
-          />
-        </FormAksi>
         <FormAksi aksi={ajukan.bind(null, id)} tombol="Ajukan ke admin">
           <p className="text-sm text-ink-2">Pengajuan pindah ke status Data lengkap dan admin bisa mengirimnya ke asuransi.</p>
         </FormAksi>
@@ -290,7 +281,30 @@ export default async function DetailPengajuan({ params }: { params: Promise<{ id
       </details>,
     );
   }
-  if ((s === "dikirim_ke_asuransi" || s === "survei_kendaraan") && !admin) tunggu("Menunggu penawaran dari asuransi.");
+  if (["dikirim_ke_asuransi", "survei_kendaraan", "penawaran_masuk", "disetujui_nasabah"].includes(s) && admin) {
+    panel.push(
+      <details key="tsi" open={!p.nilaiPertanggungan} className="rounded-2xl border border-line p-4" data-uji="panel-tsi">
+        <summary className="cursor-pointer text-sm font-bold">
+          Nilai pertanggungan dari asuransi{p.nilaiPertanggungan ? ` · ${rupiah(p.nilaiPertanggungan)}` : ""}
+        </summary>
+        <div className="pt-4">
+          <FormAksi aksi={simpanNilaiPertanggungan.bind(null, id)} tombol="Simpan nilai pertanggungan" varian="kedua">
+            <Isian
+              label="Nilai pertanggungan / TSI (Rp)"
+              name="nilaiPertanggungan"
+              inputMode="numeric"
+              placeholder="415.000.000"
+              defaultValue={p.nilaiPertanggungan ?? ""}
+              hint="Sesuai taksiran asuransi. Wajib diisi sebelum polis diterbitkan."
+              required
+              className="max-w-sm"
+            />
+          </FormAksi>
+        </div>
+      </details>,
+    );
+  }
+  if ((s === "dikirim_ke_asuransi" || s === "survei_kendaraan") && !admin) tunggu("Menunggu taksiran nilai pertanggungan & penawaran dari asuransi.");
 
   if (["dikirim_ke_asuransi", "survei_kendaraan", "penawaran_masuk"].includes(s) && admin) {
     panel.push(
@@ -502,7 +516,7 @@ export default async function DetailPengajuan({ params }: { params: Promise<{ id
   }
 
   if (s === "selesai") tunggu(`Selesai: cashback nasabah dan ${admin ? "komisi sales" : "komisi Anda"} sudah ditransfer.`);
-  if (s === "ditolak_asuransi" || s === "batal_nasabah") {
+  if (s === "ditolak_asuransi" || s === "batal_nasabah" || s === "batal_salah_input") {
     const akhir = riwayat.at(-1);
     tunggu(`${labelStatus(s)}${akhir?.h.catatan ? ` — ${catatanUntuk(akhir.h.status, akhir.h.catatan, admin)}` : ""}`);
   }
@@ -511,6 +525,8 @@ export default async function DetailPengajuan({ params }: { params: Promise<{ id
   const bolehRevisi = admin && ["data_lengkap", "dikirim_ke_asuransi", "survei_kendaraan", "penawaran_masuk"].includes(s);
   const bolehTolak = admin && !ditutup && sebelumTerbit;
   const bolehBatal = !ditutup && (n ?? 0) < 9;
+  // Salah input: sebelum polis terbit, oleh sales pemilik atau admin.
+  const bolehSalahInput = !ditutup && sebelumTerbit;
 
   return (
     <>
@@ -613,7 +629,7 @@ export default async function DetailPengajuan({ params }: { params: Promise<{ id
             </Kartu>
           )}
 
-          {(bolehRevisi || bolehTolak || bolehBatal) && (
+          {(bolehRevisi || bolehTolak || bolehBatal || bolehSalahInput) && (
             <Kartu>
               <details>
                 <summary className="cursor-pointer text-sm font-semibold text-bad">
@@ -625,8 +641,15 @@ export default async function DetailPengajuan({ params }: { params: Promise<{ id
                       {bolehRevisi && <option value="perlu_revisi">Perlu revisi (data diminta asuransi)</option>}
                       {bolehTolak && <option value="ditolak_asuransi">Ditolak asuransi</option>}
                       {bolehBatal && <option value="batal_nasabah">Batal (nasabah tidak jadi)</option>}
+                      {bolehSalahInput && <option value="batal_salah_input">Batalkan karena salah input data</option>}
                     </Pilihan>
-                    <Isian label="Alasan / catatan" name="catatan" required />
+                    <Isian label="Alasan / catatan" name="catatan" required placeholder="Mis. salah pilih kendaraan, nasabah dobel" />
+                    {bolehSalahInput && (
+                      <p className="text-[13px] text-ink-3">
+                        Salah input: pengajuan ditutup tanpa dihitung sebagai nasabah batal, link tracker dicabut, dan Anda bisa membuat pengajuan baru
+                        dengan data yang benar.
+                      </p>
+                    )}
                   </FormAksi>
                 </div>
               </details>

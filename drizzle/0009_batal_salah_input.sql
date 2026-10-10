@@ -1,0 +1,1 @@
+ALTER TYPE "public"."status_pengajuan" ADD VALUE 'batal_salah_input';

@@ -26,10 +26,16 @@ export const STATUS_SEBELUM_TERBIT: StatusPengajuan[] = [
   "perlu_revisi",
 ];
 
+/** Pengajuan yang sudah berakhir (tidak bisa berpindah status lagi). */
+export const STATUS_DITUTUP: StatusPengajuan[] = ["selesai", "ditolak_asuransi", "batal_nasabah", "batal_salah_input"];
+/** Status cabang (bukan langkah 1–12). */
+export const STATUS_CABANG: StatusPengajuan[] = ["perlu_revisi", "ditolak_asuransi", "batal_nasabah", "batal_salah_input"];
+
 export const LABEL_CABANG: Partial<Record<StatusPengajuan, string>> = {
   perlu_revisi: "Perlu revisi",
   ditolak_asuransi: "Ditolak asuransi",
   batal_nasabah: "Batal nasabah",
+  batal_salah_input: "Dibatalkan (salah input)",
 };
 
 /** Nomor langkah 1–12, atau null untuk status cabang. */
@@ -44,7 +50,9 @@ export function labelStatus(status: StatusPengajuan): string {
 
 /** Status berikutnya yang sah dari status sekarang (maju 1 langkah, survei opsional, cabang). */
 export function transisiSah(dari: StatusPengajuan, ke: StatusPengajuan): boolean {
-  if (dari === "selesai" || dari === "ditolak_asuransi" || dari === "batal_nasabah") return false;
+  if (STATUS_DITUTUP.includes(dari)) return false;
+  // Salah input hanya bisa dibatalkan sebelum polis terbit; setelah terbit pakai revisi/batal biasa.
+  if (ke === "batal_salah_input") return STATUS_SEBELUM_TERBIT.includes(dari) || dari === "data_lengkap";
   if (ke === "batal_nasabah" || ke === "ditolak_asuransi") return true;
   if (ke === "perlu_revisi") return dari !== "draft_prospek" && dari !== "perlu_revisi";
   if (dari === "perlu_revisi") return ke === "draft_prospek";

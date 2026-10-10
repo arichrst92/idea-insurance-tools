@@ -37,7 +37,7 @@ export default async function NonaktifkanSales({ params }: { params: Promise<{ i
       .select({ terbit: count() })
       .from(polis)
       .where(
-        and(eq(polis.salesId, id), notInArray(polis.statusPengajuan, [...STATUS_SEBELUM_TERBIT, "ditolak_asuransi", "batal_nasabah"])),
+        and(eq(polis.salesId, id), notInArray(polis.statusPengajuan, [...STATUS_SEBELUM_TERBIT, "ditolak_asuransi", "batal_nasabah", "batal_salah_input"])),
       ),
   ]);
   const totalPengajuan = daftar.reduce((a, n) => a + n.pengajuan, 0);
