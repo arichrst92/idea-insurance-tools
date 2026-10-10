@@ -1,26 +1,57 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* Persona warna IDEA */
+@theme {
+  --color-ink: #0b0f1a;
+  --color-ink-2: #4b5563;
+  --color-ink-3: #6b7280;
+  --color-ink-4: #9ca3af;
+  --color-canvas: #f8f9fc;
+  --color-line: #e6e8f0;
+  --color-line-2: #d5d9e4;
+  --color-brand: #2b59f0;
+  --color-brand-strong: #1e40c8;
+  --color-brand-ink: #2445d6;
+  --color-brand-soft: #eef2ff;
+  --color-brand-edge: #c7d2fe;
+  --color-wa: #157a43;
+  --color-ok: #157a43;
+  --color-ok-soft: #e7f6ee;
+  --color-warn: #b45309;
+  --color-warn-soft: #fef3c7;
+  --color-bad: #b42318;
+  --color-bad-soft: #fdecea;
+  --font-sans: "Inter Variable", system-ui, sans-serif;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html,
+body {
+  background: var(--color-canvas);
+  color: var(--color-ink);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Titik-titik dekoratif di bagian atas halaman */
+.bg-dots {
+  background-image: radial-gradient(#cdd3e4 1.2px, transparent 1.6px);
+  background-size: 22px 22px;
+  mask-image: linear-gradient(to bottom, #000 0%, transparent 100%);
+}
+
+.dock-scroll {
+  scrollbar-width: none;
+}
+.dock-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.dock-tile {
+  transition: transform 160ms ease;
+}
+.dock-item:hover .dock-tile {
+  transform: translateY(-4px) scale(1.08);
 }

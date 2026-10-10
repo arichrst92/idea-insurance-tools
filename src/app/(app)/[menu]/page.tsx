@@ -1,0 +1,33 @@
+import { notFound } from "next/navigation";
+import { Kartu, KepalaHalaman } from "@/components/ui";
+
+// Halaman sementara untuk menu dock yang dibangun di sprint berikutnya.
+const SEGERA: Record<string, { judul: string; sprint: number }> = {
+  pengajuan: { judul: "Pengajuan", sprint: 3 },
+  nasabah: { judul: "Nasabah", sprint: 2 },
+  polis: { judul: "Polis", sprint: 3 },
+  perpanjangan: { judul: "Perpanjangan", sprint: 4 },
+  klaim: { judul: "Klaim", sprint: 4 },
+  laporan: { judul: "Laporan", sprint: 5 },
+  pencairan: { judul: "Pencairan", sprint: 5 },
+  performa: { judul: "Performa", sprint: 5 },
+  panduan: { judul: "Panduan", sprint: 7 },
+  keuangan: { judul: "Keuangan", sprint: 6 },
+  "jadwal-bayar": { judul: "Jadwal bayar", sprint: 6 },
+  otomasi: { judul: "Otomasi", sprint: 6 },
+  whatsapp: { judul: "WhatsApp", sprint: 6 },
+};
+
+export default async function SegeraHadir({ params }: { params: Promise<{ menu: string }> }) {
+  const { menu } = await params;
+  const h = SEGERA[menu];
+  if (!h) notFound();
+  return (
+    <>
+      <KepalaHalaman jejak={[{ label: h.judul }]} judul={h.judul} sorot="segera hadir" />
+      <Kartu>
+        <p className="text-sm text-ink-2">Halaman ini dibangun di Sprint {h.sprint}.</p>
+      </Kartu>
+    </>
+  );
+}

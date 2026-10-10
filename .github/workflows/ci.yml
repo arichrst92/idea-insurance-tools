@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: insurance
+          POSTGRES_PASSWORD: insurance
+          POSTGRES_DB: insurance
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U insurance" --health-interval 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://insurance:insurance@localhost:5432/insurance
+      AUTH_SECRET: ci-secret
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - name: Migrasi bersih dari nol
+        run: npm run db:migrate
+      - name: Skema & migrasi sinkron
+        run: |
+          npx drizzle-kit generate --name ci-check
+          if [ -n "$(git status --porcelain drizzle)" ]; then
+            echo "::error::Skema berubah tanpa migrasi. Jalankan npm run db:generate dan commit hasilnya."
+            git status --porcelain drizzle
+            exit 1
+          fi
+      - run: npm run db:seed
+      - run: npm run build

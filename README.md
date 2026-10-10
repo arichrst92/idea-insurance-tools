@@ -1,36 +1,76 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Rekap Asuransi — insurance.ide.asia
 
-## Getting Started
+Sistem rekap nasabah, polis, cashback, dan komisi untuk agen asuransi mobil multi-asuransi.
+Dokumen perencanaan (sprint, model komisi, struktur data) ada di Claude Docs: *Sprint Plan — Sistem Rekap Asuransi Mobil*.
 
-First, run the development server:
+## Stack
+
+| Lapisan | Pilihan |
+| --- | --- |
+| App & API | Next.js 15 (App Router, Server Actions), TypeScript |
+| UI | Tailwind CSS v4, ikon lucide, font Inter (self-hosted) |
+| Database | PostgreSQL 16 + Drizzle ORM (migrasi SQL di `drizzle/`) |
+| Login | OTP WhatsApp via Fonnte, sesi 30 hari (sliding) di tabel `sessions` |
+| Infra | Docker Compose (Postgres, Redis, MinIO), Nginx di host |
+
+## Menjalankan di lokal
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cp .env.example .env.local          # isi AUTH_SECRET
+docker compose up -d db redis minio
+npm install
+npm run db:migrate
+ADMIN_NAMA="Nama Anda" ADMIN_NO_WA=0812xxxxxxx npm run db:seed
+npm run dev                          # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Tanpa `FONNTE_TOKEN`, kode OTP dicetak di terminal `npm run dev`, jadi login bisa dicoba tanpa WhatsApp.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Perintah
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Perintah | Fungsi |
+| --- | --- |
+| `npm run dev` | Server development |
+| `npm test` | Unit test (rumus komisi, gaji prorata, journey, nomor WA) |
+| `npm run typecheck` / `npm run lint` | Pemeriksaan kode |
+| `npm run db:generate` | Buat file migrasi setelah mengubah `src/db/schema.ts` |
+| `npm run db:migrate` | Terapkan migrasi |
+| `npm run db:seed` | Admin pertama, template WA, pengaturan otomasi (aman diulang) |
+| `npm run db:studio` | Lihat isi database di browser |
 
-## Learn More
+## Deploy ke VPS
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+cp .env.example .env    # isi AUTH_SECRET, FONNTE_TOKEN, POSTGRES_PASSWORD, dst.
+docker compose --profile prod up -d --build
+docker compose --profile prod run --rm migrate npx tsx scripts/seed.ts   # sekali, untuk admin pertama
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Aplikasi listen di `127.0.0.1:3000`; Nginx di host meneruskan `insurance.ide.asia` ke sana dengan SSL (Certbot).
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Struktur
 
-## Deploy on Vercel
+```
+src/
+  app/
+    login/            Login OTP WhatsApp
+    (app)/            Halaman setelah login (dock menu bawah)
+      master/         Asuransi + kontak PIC, kategori polis, bengkel, rekening kantor
+      sales/          Pengguna & sales (fulltime/freelance, target, gaji, bagi hasil, rekening)
+      verifikasi/     OTP ulang untuk tindakan sensitif (> 12 jam)
+  db/schema.ts        Seluruh tabel (33 tabel sesuai dokumen)
+  lib/domain/         Rumus bisnis murni + test: komisi, event bagi hasil, gaji, journey
+  lib/auth/           OTP, sesi, hash
+  lib/fonnte.ts       Klien WhatsApp Fonnte
+  middleware.ts       Arahkan tamu ke /login, perpanjang cookie "ingat perangkat"
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Status sprint
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- [x] **Sprint 1 — Fondasi & login**: repo, skema database lengkap, Docker, CI, login OTP + sesi persisten, role admin/sales, dock & breadcrumb, master asuransi (+ kontak email & WA PIC), kategori polis, bengkel, rekening kantor, form sales (fulltime/freelance, target bulanan, gaji pokok, bagi hasil, maks cashback, rekening)
+- [ ] Sprint 2 — Nasabah & kendaraan
+- [ ] Sprint 3 — Polis & cashback (termasuk link tracker nasabah)
+- [ ] Sprint 4 — Perpanjangan & klaim
+- [ ] Sprint 5 — Laporan & pencairan
+- [ ] Sprint 6 — Keuangan & ekspor PDF
+- [ ] Sprint 7 — UAT & go-live
