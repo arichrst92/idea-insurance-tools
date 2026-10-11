@@ -14,10 +14,11 @@ export function middleware(req: NextRequest) {
   const publik = PUBLIK.some((p) => pathname === p || pathname.startsWith(p));
 
   if (!token && !publik) {
-    const url = req.nextUrl.clone();
-    url.pathname = "/login";
-    url.search = "";
-    return NextResponse.redirect(url);
+    // Di belakang Nginx, req.nextUrl berisi host internal (localhost:3100). Pakai host asli
+    // dari header Host / X-Forwarded-* agar browser tidak diarahkan ke localhost.
+    const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host") ?? req.nextUrl.host;
+    const proto = req.headers.get("x-forwarded-proto")?.split(",")[0].trim() ?? req.nextUrl.protocol.replace(":", "");
+    return NextResponse.redirect(new URL("/login", `${proto}://${host}`));
   }
 
   const res = NextResponse.next();
