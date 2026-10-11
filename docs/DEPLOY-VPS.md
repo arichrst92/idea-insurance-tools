@@ -130,9 +130,9 @@ Diukur dari build produksi (`server.js` idle ≈ 200 MB RSS).
 
 1. Di Mac: `git tag v1.0.0 && git push --tags` → GitHub Actions **Rilis** membangun `insurance-v1.0.0.tar.gz`
    (Linux x64, Node 20; berisi server Next mandiri, migrasi, `migrate.mjs`, `seed.mjs`). Bisa juga *Run workflow* manual.
-2. Unduh artifact, `scp insurance-v1.0.0.tar.gz insurance-deploy@72.60.74.202:/tmp/`.
-3. Di VPS (window Senin–Kamis 22:00–01:00 atau akhir pekan dini hari):
-   `/var/www/insurance/bin/pasang-rilis.sh /tmp/insurance-v1.0.0.tar.gz`
+2. Unduh artifact, `scp insurance-v1.0.0.tar.gz root@72.60.74.202:/tmp/`.
+3. Di VPS (`ssh root@72.60.74.202`; window Senin–Kamis 22:00–01:00 atau akhir pekan dini hari):
+   `sudo -u insurance-deploy -H /var/www/insurance/bin/pasang-rilis.sh /tmp/insurance-v1.0.0.tar.gz`
    → backup DB pra-rilis → migrasi → ganti symlink `current` → restart `insurance-app` → cek `/api/sehat`
    (gagal = otomatis kembali ke rilis sebelumnya). Rollback manual: `pasang-rilis.sh --rollback`.
 
@@ -150,7 +150,7 @@ Restart `insurance-app` hanya memengaruhi aplikasi ini; Nginx tidak perlu reload
 - Harian 02:30 WIB: `pg_dump` (format custom) + file upload (penuh tiap Minggu, harian hanya file 2 hari terakhir),
   disimpan 14 hari di `/var/backups/insurance/`. Juga otomatis sebelum setiap rilis.
 - Salin ke luar VPS (wajib, VPS bisa hilang): mis. `rclone` ke Google Drive kantor dari Mac/NAS tiap minggu, atau
-  tarik dengan `rsync -a insurance-deploy@72.60.74.202:/var/backups/insurance/ ~/Backup/insurance/`.
+  tarik dengan `rsync -a root@72.60.74.202:/var/backups/insurance/ ~/Backup/insurance/`.
 - Uji restore tiap bulan: `pg_restore --clean --no-owner -d <db_uji> db-….dump`.
 
 ## 9. Darurat
