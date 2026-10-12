@@ -11,6 +11,7 @@ import { capaian, realisasiBulanan } from "@/lib/performa";
 import { rekapKomisiSiapBayar } from "@/lib/pencairan";
 import { escapeHtml, kirimEmail } from "@/lib/email";
 import { rupiah } from "@/lib/format";
+import { stafSql } from "@/lib/peran";
 
 /** Status yang menunggu tindakan sales; selebihnya menunggu admin. */
 const MENUNGGU_SALES: StatusPengajuan[] = ["draft_prospek", "perlu_revisi", "penawaran_masuk", "polis_terbit", "menunggu_bayar"];
@@ -18,7 +19,7 @@ const MENUNGGU_SALES: StatusPengajuan[] = ["draft_prospek", "perlu_revisi", "pen
 const STATUS_CEPAT: StatusPengajuan[] = ["penawaran_masuk", "menunggu_bayar"];
 
 async function adminAktif() {
-  return db.select({ id: users.id }).from(users).where(and(eq(users.role, "admin"), eq(users.aktif, true)));
+  return db.select({ id: users.id }).from(users).where(and(stafSql(), eq(users.aktif, true)));
 }
 
 /** Notifikasi in-app, tidak dobel untuk user + link + jenis yang sama dalam 20 jam. */
@@ -219,12 +220,13 @@ export async function jobLaporanBerkala(param: { mingguan?: boolean; bulanan?: b
   }
   if (periodeList.length === 0) return { jumlah: 0, ringkasan: "Hari ini bukan jadwal laporan (Senin / tanggal 1)" };
 
-  const [admin] = await db.select().from(users).where(and(eq(users.role, "admin"), eq(users.aktif, true))).limit(1);
-  if (!admin) return { jumlah: 0, ringkasan: "Tidak ada admin aktif" };
+  // Laporan keuangan memuat bagian kantor & saldo: dibuat atas nama owner, dikirim ke email owner.
+  const [admin] = await db.select().from(users).where(and(eq(users.role, "owner"), eq(users.aktif, true))).limit(1);
+  if (!admin) return { jumlah: 0, ringkasan: "Tidak ada owner aktif" };
   const penerima = opsi.penerima?.length
     ? opsi.penerima
-    : (await db.select({ e: users.email }).from(users).where(and(eq(users.role, "admin"), eq(users.aktif, true)))).map((x) => x.e).filter((x): x is string => !!x);
-  if (penerima.length === 0) return { jumlah: 0, ringkasan: "Penerima laporan belum diatur (isi di halaman Otomasi atau email admin)" };
+    : (await db.select({ e: users.email }).from(users).where(and(eq(users.role, "owner"), eq(users.aktif, true)))).map((x) => x.e).filter((x): x is string => !!x);
+  if (penerima.length === 0) return { jumlah: 0, ringkasan: "Penerima laporan belum diatur (isi di halaman Otomasi atau email owner)" };
 
   const { renderPdf } = await import("@/lib/ekspor/antrian");
   let jumlah = 0;

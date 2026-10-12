@@ -6,17 +6,18 @@ import { FormAksi } from "@/components/form-aksi";
 import { Kartu, KepalaHalaman, Pilihan } from "@/components/ui";
 import { IsianKendaraan, IsianNasabah } from "../isian";
 import { buatNasabah } from "../actions";
+import { adalahStaf, bisaJual, penjualSql } from "@/lib/peran";
 
 export const metadata = { title: "Tambah nasabah" };
 
 export default async function NasabahBaru() {
   const { user } = await wajibLogin();
   const sales =
-    user.role === "admin"
+    adalahStaf(user)
       ? await db
           .select({ id: users.id, nama: users.nama })
           .from(users)
-          .where(and(eq(users.role, "sales"), eq(users.aktif, true)))
+          .where(and(penjualSql(), eq(users.aktif, true)))
           .orderBy(asc(users.nama))
       : [];
 
@@ -30,14 +31,14 @@ export default async function NasabahBaru() {
       />
       <Kartu className="max-w-4xl">
         <FormAksi aksi={buatNasabah} tombol="Simpan nasabah" className="flex flex-col gap-6">
-          {user.role === "admin" && (
-            <Pilihan label="Sales pemilik" name="salesId" required defaultValue="" className="max-w-sm">
+          {adalahStaf(user) && (
+            <Pilihan label="Sales pemilik" name="salesId" required defaultValue={bisaJual(user) ? user.id : ""} className="max-w-sm">
               <option value="" disabled>
                 Pilih sales…
               </option>
               {sales.map((s) => (
                 <option key={s.id} value={s.id}>
-                  {s.nama}
+                  {s.id === user.id ? `${s.nama} (saya)` : s.nama}
                 </option>
               ))}
             </Pilihan>

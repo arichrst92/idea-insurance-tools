@@ -21,6 +21,7 @@ import { Isian, IsianPanjang, Kartu, KepalaHalaman, Lencana } from "@/components
 import { TeksPanduan } from "@/components/teks-panduan";
 import { ChecklistOnboarding } from "@/components/checklist-onboarding";
 import { centangOnboarding, pulihkanBagian, simpanBagian, tambahBagian } from "./actions";
+import { adalahStaf, stafSql } from "@/lib/peran";
 
 export const metadata = { title: "Panduan" };
 export const dynamic = "force-dynamic";
@@ -33,7 +34,7 @@ type Item =
 
 export default async function HalamanPanduan() {
   const { user } = await wajibLogin();
-  const admin = user.role === "admin";
+  const admin = adalahStaf(user);
   if (!admin) await tandaiPanduanDibuka(user.id);
 
   const [bagian, onboarding, progres, kontak] = await Promise.all([
@@ -43,7 +44,7 @@ export default async function HalamanPanduan() {
     db
       .select({ nama: users.nama, noWa: users.noWa })
       .from(users)
-      .where(and(eq(users.role, "admin"), eq(users.aktif, true)))
+      .where(and(stafSql(), eq(users.aktif, true)))
       .orderBy(asc(users.nama)),
   ]);
 

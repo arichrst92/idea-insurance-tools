@@ -39,7 +39,7 @@ function bacaEvent(f: FormData) {
 }
 
 export async function buatEvent(_: StateForm, f: FormData): Promise<StateForm> {
-  const { user } = await wajibLogin("admin");
+  const { user } = await wajibLogin("owner");
   const d = bacaEvent(f);
   if (!d.success) return { error: d.error.issues[0]?.message };
   const [e] = await db.insert(eventBagiHasil).values(d.data).returning({ id: eventBagiHasil.id });
@@ -53,7 +53,7 @@ export async function buatEvent(_: StateForm, f: FormData): Promise<StateForm> {
  * disalin ke polis); perubahan berlaku untuk persetujuan berikutnya.
  */
 export async function ubahEvent(id: string, _: StateForm, f: FormData): Promise<StateForm> {
-  const { user } = await wajibLogin("admin");
+  const { user } = await wajibLogin("owner");
   const d = bacaEvent(f);
   if (!d.success) return { error: d.error.issues[0]?.message };
   await db.update(eventBagiHasil).set(d.data).where(eq(eventBagiHasil.id, id));
@@ -64,7 +64,7 @@ export async function ubahEvent(id: string, _: StateForm, f: FormData): Promise<
 
 /** Hapus event yang belum dipakai polis; yang sudah dipakai hanya bisa dinonaktifkan. */
 export async function hapusEvent(id: string): Promise<StateForm> {
-  const { user } = await wajibLogin("admin");
+  const { user } = await wajibLogin("owner");
   const [{ n }] = await db.select({ n: count() }).from(polis).where(eq(polis.eventId, id));
   if (n > 0) return { error: `Event sudah dipakai ${n} polis, tidak bisa dihapus. Nonaktifkan saja agar tidak berlaku lagi.` };
   await db.delete(eventBagiHasil).where(eq(eventBagiHasil.id, id));
@@ -74,7 +74,7 @@ export async function hapusEvent(id: string): Promise<StateForm> {
 }
 
 export async function ubahAktifEvent(id: string, aktif: boolean) {
-  const { user } = await wajibLogin("admin");
+  const { user } = await wajibLogin("owner");
   await db.update(eventBagiHasil).set({ aktif }).where(eq(eventBagiHasil.id, id));
   await catatAudit({ userId: user.id, aksi: aktif ? "aktifkan" : "nonaktifkan", tabel: "event_bagi_hasil", recordId: id });
   revalidatePath("/event");

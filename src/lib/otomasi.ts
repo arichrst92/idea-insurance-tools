@@ -5,6 +5,7 @@ import { notifikasi, otomasiLog, otomasiSetting, users } from "@/db/schema";
 import { cocokCron, waktuWib } from "@/lib/domain/perpanjangan";
 import { jobDraftPerpanjangan, jobRemindPerpanjangan } from "@/lib/perpanjangan";
 import { jobAlertMandek, jobLaporanBerkala, jobRekapKomisi, jobTagihCashback, jobTutupBukuTarget } from "@/lib/otomasi-jobs";
+import { stafSql } from "@/lib/peran";
 
 type Hasil = { jumlah: number; ringkasan: string };
 type Opsi = { paksa?: boolean; penerima?: string[] };
@@ -42,7 +43,7 @@ export async function jalankanOtomasi(kode: string, opsi: { paksa?: boolean } = 
     await db.update(otomasiLog).set({ selesai: new Date(), status: "gagal", error: pesan }).where(eq(otomasiLog.id, log.id));
     console.error(`[otomasi:${kode}]`, e);
     // Kabari admin bahwa otomasi gagal.
-    const admins = await db.select({ id: users.id }).from(users).where(and(eq(users.role, "admin"), eq(users.aktif, true)));
+    const admins = await db.select({ id: users.id }).from(users).where(and(stafSql(), eq(users.aktif, true)));
     if (admins.length)
       await db.insert(notifikasi).values(admins.map((a) => ({ userId: a.id, jenis: "otomasi_gagal", judul: `Otomasi gagal: ${s.nama}`, isi: pesan.slice(0, 300), link: "/otomasi" })));
     return { ok: false as const, pesan };

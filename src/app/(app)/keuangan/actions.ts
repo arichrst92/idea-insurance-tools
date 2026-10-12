@@ -26,7 +26,7 @@ async function simpanBukti(f: FormData, userId: string) {
 
 /** Entri manual: saldo awal, biaya operasional, lain-lain. */
 export async function entriManual(_: StateForm, f: FormData): Promise<StateForm> {
-  const { user } = await wajibLogin("admin");
+  const { user } = await wajibLogin("owner");
   const kategori = teks(f, "kategori") as KategoriKas;
   const k = KATEGORI_KAS[kategori];
   if (!k || k.otomatis || kategori === "penarikan") return { error: "Pilih kategori" };
@@ -54,7 +54,7 @@ export async function entriManual(_: StateForm, f: FormData): Promise<StateForm>
 
 /** Penarikan kantor: wajib OTP ulang (> 12 jam), bukti, dan tidak melebihi saldo bisa ditarik. */
 export async function tarikDana(_: StateForm, f: FormData): Promise<StateForm> {
-  const sesi = await wajibLogin("admin");
+  const sesi = await wajibLogin("owner");
   if (perluVerifikasiUlang(sesi)) return { error: "Verifikasi OTP ulang dulu sebelum penarikan (terakhir lebih dari 12 jam)." };
   const nominal = parseRupiah(teks(f, "nominal"));
   const tanggal = teks(f, "tanggal");
@@ -85,7 +85,7 @@ export async function tarikDana(_: StateForm, f: FormData): Promise<StateForm> {
 
 /** Hapus entri manual yang salah input (entri otomatis tidak bisa dihapus). */
 export async function hapusEntri(id: string) {
-  const { user } = await wajibLogin("admin");
+  const { user } = await wajibLogin("owner");
   const [e] = await db.delete(kasKantor).where(and(eq(kasKantor.id, id), eq(kasKantor.sumber, "manual"))).returning();
   if (e) await catatAudit({ userId: user.id, aksi: "hapus", tabel: "kas_kantor", recordId: id, detail: { kategori: e.kategori, nominal: e.nominal } });
   revalidatePath("/keuangan");

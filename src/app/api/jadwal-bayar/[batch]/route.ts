@@ -1,13 +1,14 @@
 import { sesiSekarang } from "@/lib/auth/session";
 import { csvBatch } from "@/lib/jadwal-bayar";
+import { adalahStaf } from "@/lib/peran";
 
 // Unduh CSV transfer massal satu batch (admin).
 export async function GET(_: Request, { params }: { params: Promise<{ batch: string }> }) {
   const s = await sesiSekarang();
-  if (s?.user.role !== "admin") return new Response("Tidak diizinkan", { status: 403 });
+  if (!s || !adalahStaf(s.user)) return new Response("Tidak diizinkan", { status: 403 });
   const { batch } = await params;
   const h = await csvBatch(batch);
-  if (!h) return new Response("Tidak ditemukan", { status: 404 });
+  if (!h) return new Response("Tidak ditemukan atau belum disetujui owner", { status: 404 });
   const tgl = h.batch.dibuat.toISOString().slice(0, 10);
   return new Response(h.csv, {
     headers: {

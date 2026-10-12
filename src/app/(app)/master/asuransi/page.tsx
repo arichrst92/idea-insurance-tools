@@ -3,6 +3,8 @@ import clsx from "clsx";
 import { asc } from "drizzle-orm";
 import { db } from "@/db";
 import { kategoriPolis, kontakAsuransi, perusahaanAsuransi } from "@/db/schema";
+import { wajibLogin } from "@/lib/auth/session";
+import { adalahOwner } from "@/lib/peran";
 import { TabMaster } from "@/app/(app)/master/tab-master";
 import { Kartu, KepalaHalaman, Kosong, Lencana, TautanTombol } from "@/components/ui";
 import { formatNoWa } from "@/lib/wa";
@@ -25,7 +27,7 @@ export default async function DaftarAsuransi() {
         sub="Email underwriting dan WhatsApp PIC dipakai untuk mengirim data pengajuan; paket coverage diatur per asuransi."
         aksi={<TautanTombol href="/master/asuransi/baru">Tambah asuransi</TautanTombol>}
       />
-      <TabMaster />
+      <TabMaster owner={adalahOwner((await wajibLogin("admin")).user)} />
       {daftar.length === 0 ? (
         <Kosong>Belum ada perusahaan asuransi.</Kosong>
       ) : (

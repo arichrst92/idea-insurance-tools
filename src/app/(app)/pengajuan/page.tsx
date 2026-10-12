@@ -9,6 +9,8 @@ import { BarJourney, LencanaStatus } from "@/components/journey";
 import { LANGKAH, nomorLangkah } from "@/lib/domain/journey";
 import { rupiah } from "@/lib/format";
 import { TombolPdf } from "@/components/tombol-ekspor";
+import { adalahStaf, bisaJual, penjualSql } from "@/lib/peran";
+import { whereGiliran } from "@/lib/daftar-pengajuan";
 
 export const metadata = { title: "Pengajuan" };
 
@@ -21,12 +23,6 @@ const TAB = {
   semua: { label: "Semua", where: undefined },
 } as const;
 
-// Status yang menunggu tindakan masing-masing peran.
-const GILIRAN: Record<"admin" | "sales", StatusPengajuan[]> = {
-  sales: ["draft_prospek", "perlu_revisi", "penawaran_masuk", "polis_terbit", "menunggu_bayar"],
-  admin: ["data_lengkap", "dikirim_ke_asuransi", "survei_kendaraan", "disetujui_nasabah", "lunas", "premi_disetor", "cashback_cair"],
-};
-
 export default async function DaftarPengajuan({
   searchParams,
 }: {
@@ -34,11 +30,11 @@ export default async function DaftarPengajuan({
 }) {
   const { user } = await wajibLogin();
   const sp = await searchParams;
-  const admin = user.role === "admin";
+  const admin = adalahStaf(user);
   const tab = (sp.tab && sp.tab in TAB ? sp.tab : "berjalan") as keyof typeof TAB;
   const q = sp.q?.trim() ?? "";
 
-  const whereTab = tab === "giliran" ? inArray(polis.statusPengajuan, GILIRAN[user.role]) : TAB[tab].where;
+  const whereTab = tab === "giliran" ? whereGiliran(user) : TAB[tab].where;
   const where = and(
     admin ? (sp.sales ? eq(polis.salesId, sp.sales) : undefined) : eq(polis.salesId, user.id),
     whereTab,
@@ -61,7 +57,7 @@ export default async function DaftarPengajuan({
     (v: string) => new Date(v),
   );
 
-  const [daftar, ringkas, salesList] = await Promise.all([
+  const [daftar, ringkas, salesList, nGiliran] = await Promise.all([
     db
       .select({
         p: polis,
@@ -87,13 +83,18 @@ export default async function DaftarPengajuan({
       .where(admin ? (sp.sales ? eq(polis.salesId, sp.sales) : undefined) : eq(polis.salesId, user.id))
       .groupBy(polis.statusPengajuan),
     admin
-      ? db.select({ id: users.id, nama: users.nama }).from(users).where(eq(users.role, "sales")).orderBy(asc(users.nama))
+      ? db.select({ id: users.id, nama: users.nama }).from(users).where(penjualSql()).orderBy(asc(users.nama))
       : Promise.resolve([]),
+    db
+      .select({ n: count() })
+      .from(polis)
+      .where(and(admin ? (sp.sales ? eq(polis.salesId, sp.sales) : undefined) : eq(polis.salesId, user.id), whereGiliran(user)))
+      .then(([r]) => r.n),
   ]);
   const jml = (ss: readonly StatusPengajuan[]) => ringkas.filter((r) => ss.includes(r.status)).reduce((a, r) => a + r.n, 0);
   const jumlahTab: Record<keyof typeof TAB, number> = {
     berjalan: jml(LANGKAH.slice(0, 11).map((l) => l.status).concat("perlu_revisi")),
-    giliran: jml(GILIRAN[user.role]),
+    giliran: nGiliran,
     selesai: jml(["selesai"]),
     ditutup: jml(DITUTUP),
     semua: ringkas.reduce((a, r) => a + r.n, 0),
@@ -158,12 +159,24 @@ export default async function DaftarPengajuan({
             <option value="">Semua sales</option>
             {salesList.map((s) => (
               <option key={s.id} value={s.id}>
-                {s.nama}
+                {s.id === user.id ? `${s.nama} (saya)` : s.nama}
               </option>
             ))}
           </select>
         )}
         <button className="h-11 rounded-full bg-ink px-5 text-sm font-semibold text-white">Cari</button>
+        {admin && bisaJual(user) && (
+          <Link
+            href={sp.sales === user.id ? `/pengajuan?tab=${tab}` : `/pengajuan?tab=${tab}&sales=${user.id}`}
+            data-uji="filter-milik-saya"
+            className={clsx(
+              "flex h-11 items-center rounded-full border px-4 text-sm font-semibold",
+              sp.sales === user.id ? "border-ink bg-ink text-white" : "border-line-2 bg-white text-ink-2",
+            )}
+          >
+            Pengajuan saya
+          </Link>
+        )}
       </form>
 
       {daftar.length === 0 ? (

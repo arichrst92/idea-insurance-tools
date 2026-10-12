@@ -11,6 +11,7 @@ import { FileTidakValid, simpanFile } from "@/lib/storage";
 import { waktuWib } from "@/lib/domain/perpanjangan";
 import { STATUS_TERBIT } from "@/lib/perpanjangan";
 import type { StateForm } from "@/components/form-aksi";
+import { adalahStaf } from "@/lib/peran";
 
 const teks = (f: FormData, k: string) => String(f.get(k) ?? "").trim();
 const MAKS_FOTO = 20;
@@ -22,7 +23,7 @@ export async function polisUntukKlaim(user: User, polisId: string) {
     .from(polis)
     .innerJoin(nasabah, eq(nasabah.id, polis.nasabahId))
     .where(
-      and(eq(polis.id, polisId), user.role === "admin" ? undefined : or(eq(polis.salesId, user.id), eq(nasabah.salesId, user.id))),
+      and(eq(polis.id, polisId), adalahStaf(user) ? undefined : or(eq(polis.salesId, user.id), eq(nasabah.salesId, user.id))),
     );
   return b?.p ?? null;
 }

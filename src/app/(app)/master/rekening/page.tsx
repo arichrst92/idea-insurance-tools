@@ -3,12 +3,15 @@ import { db } from "@/db";
 import { rekening } from "@/db/schema";
 import { FormAksi } from "@/components/form-aksi";
 import { Isian, Kartu, KepalaHalaman, Kosong, Lencana, Pilihan } from "@/components/ui";
+import { wajibLogin } from "@/lib/auth/session";
+import { adalahOwner } from "@/lib/peran";
 import { TabMaster } from "../tab-master";
 import { tambahRekeningKantor, ubahAktifRekening } from "../actions";
 
 export const metadata = { title: "Rekening kantor" };
 
 export default async function HalamanRekening() {
+  await wajibLogin("owner");
   const daftar = await db
     .select()
     .from(rekening)
@@ -23,7 +26,7 @@ export default async function HalamanRekening() {
         sorot="kantor & pembayaran"
         sub="Rekening pembayaran dipilih per polis di instruksi bayar; rekening kantor dipakai di buku kas."
       />
-      <TabMaster />
+      <TabMaster owner={adalahOwner((await wajibLogin("admin")).user)} />
       <div className="grid items-start gap-4 lg:grid-cols-[1.6fr_1fr]">
         <Kartu>
           {daftar.length === 0 ? (

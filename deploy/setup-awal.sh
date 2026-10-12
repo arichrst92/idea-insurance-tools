@@ -169,10 +169,10 @@ fi
 
 # ───────────────────────── 8. Admin pertama ─────────────────────────
 judul "8. Admin pertama"
-JML_ADMIN=$(sudo -u postgres psql -d ${APP}_prod -tAc "select count(*) from users where role='admin'" 2>/dev/null || echo 0)
+JML_ADMIN=$(sudo -u postgres psql -d ${APP}_prod -tAc "select count(*) from users where role in ('admin','owner')" 2>/dev/null || echo 0)
 if [ "$JML_ADMIN" = 0 ]; then
-  read -r -p "Nama admin: " AN
-  read -r -p "No WhatsApp admin (08…): " AW
+  read -r -p "Nama owner: " AN
+  read -r -p "No WhatsApp owner (08…): " AW
   sudo -u "$USR" -H env PATH="$(dirname "$NODE"):/usr/bin:/bin" bash -c "cd $DIR/current && set -a && . $ENVF && set +a && ADMIN_NAMA='$AN' ADMIN_NO_WA='$AW' node seed.mjs"
 else
   sudo -u "$USR" -H env PATH="$(dirname "$NODE"):/usr/bin:/bin" bash -c "cd $DIR/current && set -a && . $ENVF && set +a && node seed.mjs" >/dev/null

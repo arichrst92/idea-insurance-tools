@@ -43,6 +43,7 @@ import {
   varsPesanNasabah,
 } from "@/lib/pengajuan";
 import type { StateForm } from "@/components/form-aksi";
+import { adalahStaf } from "@/lib/peran";
 
 const teks = (f: FormData, k: string) => String(f.get(k) ?? "").trim();
 const opsional = (f: FormData, k: string) => teks(f, k) || null;
@@ -397,7 +398,7 @@ export async function setujuiPenawaran(id: string, _: StateForm, f: FormData): P
     segarkan(id);
     return {
       ok:
-        user.role === "admin"
+        adalahStaf(user)
           ? `Disetujui. Komisi sales ${rupiah(k.komisiSalesRp)}${k.komisiEventRp > 0 ? ` (dasar ${rupiah(k.komisiDasarRp)} + event ${rupiah(k.komisiEventRp)})` : ""}`
           : `Disetujui. Komisi Anda ${rupiah(k.komisiSalesRp)}${k.komisiEventRp > 0 ? ` (reguler ${rupiah(k.komisiDasarRp)} + bonus event ${rupiah(k.komisiEventRp)})` : ""}`,
     };
@@ -617,7 +618,7 @@ export async function ubahCabang(id: string, _: StateForm, f: FormData): Promise
   const p0 = await polisMilik(user, id);
   const ke = teks(f, "ke") as StatusPengajuan;
   if (!["perlu_revisi", "ditolak_asuransi", "batal_nasabah", "batal_salah_input"].includes(ke)) return { error: "Status tidak valid" };
-  if (user.role !== "admin" && ke !== "batal_nasabah" && ke !== "batal_salah_input") return { error: "Hanya admin" };
+  if (!adalahStaf(user) && ke !== "batal_nasabah" && ke !== "batal_salah_input") return { error: "Hanya admin" };
   const catatan = teks(f, "catatan");
   if (catatan.length < 3) return { error: "Isi alasan / catatan" };
   return jalankan(async () => {

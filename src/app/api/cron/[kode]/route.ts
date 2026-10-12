@@ -1,6 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import { sesiSekarang } from "@/lib/auth/session";
 import { jalankanOtomasi } from "@/lib/otomasi";
+import { adalahStaf } from "@/lib/peran";
 
 // Picu otomasi dari cron luar: POST /api/cron/<kode> dengan header
 // "Authorization: Bearer <CRON_SECRET>". Admin yang sedang login juga boleh.
@@ -16,7 +17,7 @@ function rahasiaCocok(req: Request) {
 export async function POST(req: Request, { params }: { params: Promise<{ kode: string }> }) {
   if (!rahasiaCocok(req)) {
     const s = await sesiSekarang();
-    if (s?.user.role !== "admin") return Response.json({ ok: false, pesan: "Tidak diizinkan" }, { status: 401 });
+    if (!s || !adalahStaf(s.user)) return Response.json({ ok: false, pesan: "Tidak diizinkan" }, { status: 401 });
   }
   const { kode } = await params;
   const h = await jalankanOtomasi(kode, { paksa: new URL(req.url).searchParams.get("paksa") === "1" });

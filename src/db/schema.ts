@@ -30,7 +30,8 @@ const dibuat = () => waktu().notNull().defaultNow();
 
 // ───────────────────────── Enum ─────────────────────────
 
-export const roleEnum = pgEnum("role", ["admin", "sales"]);
+/** owner = pemilik (semua menu admin + keuangan & kebijakan); admin = operasional; sales = penjual. */
+export const roleEnum = pgEnum("role", ["admin", "sales", "owner"]);
 export const tipeSalesEnum = pgEnum("tipe_sales", ["fulltime", "freelance"]);
 export const targetUtamaEnum = pgEnum("target_utama", ["case", "revenue"]);
 export const berlakuEventEnum = pgEnum("berlaku_event", ["semua", "fulltime", "freelance", "pilihan"]);
@@ -122,6 +123,8 @@ export const users = pgTable("users", {
   noWa: text().notNull().unique(),
   email: text(),
   role: roleEnum().notNull().default("sales"),
+  /** Owner yang juga berjualan: punya nasabah/pengajuan & komisi seperti sales. */
+  jugaSales: boolean().notNull().default(false),
   kodeSales: text().unique(),
   tipeSales: tipeSalesEnum(),
   gajiPokok: rupiah(),
@@ -496,6 +499,9 @@ export const batchTransfer = pgTable("batch_transfer", {
   diekspor: waktu(),
   dibayar: waktu(),
   buktiDokumenId: text(),
+  /** Batch buatan admin menunggu persetujuan owner sebelum CSV bisa diunduh / ditandai dibayar. */
+  disetujui: waktu(),
+  disetujuiOleh: text().references(() => users.id),
 });
 
 export const jadwalBayar = pgTable(

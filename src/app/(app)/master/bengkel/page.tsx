@@ -3,6 +3,8 @@ import { db } from "@/db";
 import { bengkel } from "@/db/schema";
 import { FormAksi } from "@/components/form-aksi";
 import { Isian, Kartu, KepalaHalaman, Kosong, Lencana } from "@/components/ui";
+import { wajibLogin } from "@/lib/auth/session";
+import { adalahOwner } from "@/lib/peran";
 import { TabMaster } from "../tab-master";
 import { tambahBengkel, ubahAktifBengkel } from "../actions";
 
@@ -18,7 +20,7 @@ export default async function HalamanBengkel() {
         sorot="rekanan"
         sub="Dipilih saat mencatat klaim."
       />
-      <TabMaster />
+      <TabMaster owner={adalahOwner((await wajibLogin("admin")).user)} />
       <div className="grid items-start gap-4 lg:grid-cols-[1.6fr_1fr]">
         <Kartu>
           {daftar.length === 0 ? (

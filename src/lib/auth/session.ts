@@ -7,6 +7,7 @@ import { db } from "@/db";
 import { sessions, users, type User } from "@/db/schema";
 import { hash, tokenSesi } from "./crypto";
 import { otpDibypass } from "./bypass";
+import { adalahOwner, adalahStaf, bisaJual } from "@/lib/peran";
 
 // Sesi persisten 30 hari, diperpanjang otomatis setiap dipakai (sliding).
 // Token mentah hanya ada di cookie; database menyimpan hash-nya, sehingga
@@ -73,11 +74,24 @@ export const sesiSekarang = cache(async (): Promise<SesiAktif | null> => {
   return baris;
 });
 
-/** Wajib login (opsional: wajib role tertentu). Redirect ke /login bila tidak. */
-export async function wajibLogin(role?: User["role"]): Promise<SesiAktif> {
+/**
+ * Wajib login, opsional dengan syarat peran. Redirect ke /login bila belum login, ke / bila tidak berhak.
+ * - "admin"  : admin ATAU owner (owner melihat semua menu admin)
+ * - "owner"  : hanya owner
+ * - "sales"  : hanya role sales (mis. checklist onboarding)
+ * - "penjual": sales atau owner yang merangkap sales
+ */
+export async function wajibLogin(syarat?: "admin" | "owner" | "sales" | "penjual"): Promise<SesiAktif> {
   const s = await sesiSekarang();
   if (!s) redirect("/login");
-  if (role && s.user.role !== role) redirect("/");
+  const u = s.user;
+  const boleh =
+    !syarat ||
+    (syarat === "admin" && adalahStaf(u)) ||
+    (syarat === "owner" && adalahOwner(u)) ||
+    (syarat === "sales" && u.role === "sales") ||
+    (syarat === "penjual" && bisaJual(u));
+  if (!boleh) redirect("/");
   return s;
 }
 

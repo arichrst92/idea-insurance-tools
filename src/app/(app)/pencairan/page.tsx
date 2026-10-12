@@ -6,6 +6,7 @@ import { Angka } from "@/components/laporan";
 import { LABEL_TAHAP, dataPencairan, rekapKomisiSiapBayar, type BarisCair, type Tahap } from "@/lib/pencairan";
 import { waktuWib } from "@/lib/domain/perpanjangan";
 import { rupiah } from "@/lib/format";
+import { adalahStaf } from "@/lib/peran";
 
 export const metadata = { title: "Pencairan" };
 
@@ -14,7 +15,7 @@ const TAB_SALES: (Tahap | "selesai")[] = ["nasabah", "komisi", "selesai"];
 
 export default async function HalamanPencairan({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
   const { user } = await wajibLogin();
-  const admin = user.role === "admin";
+  const admin = adalahStaf(user);
   const { tab: tabQ } = await searchParams;
   const tabs = admin ? TAB_ADMIN : TAB_SALES;
   const tab = (tabs.includes(tabQ as Tahap) ? tabQ : tabs[0]) as Tahap | "selesai";

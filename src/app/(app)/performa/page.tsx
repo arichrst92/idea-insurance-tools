@@ -11,6 +11,7 @@ import { filterDari, type SP } from "../laporan/util";
 import { capaian, peringkat, realisasiSemua, targetRentang } from "@/lib/performa";
 import { renewal } from "@/lib/laporan";
 import { angka, persen, rupiah } from "@/lib/format";
+import { adalahStaf, penjualSql } from "@/lib/peran";
 
 export const metadata = { title: "Performa" };
 
@@ -32,14 +33,14 @@ function Bar({ label, nilai, target, persenCapai, format }: { label: string; nil
 
 export default async function HalamanPerforma({ searchParams }: { searchParams: Promise<SP> }) {
   const { user } = await wajibLogin();
-  const admin = user.role === "admin";
+  const admin = adalahStaf(user);
   const sp = await searchParams;
   const { p } = filterDari(sp);
 
   const daftarSales = await db
     .select()
     .from(users)
-    .where(and(eq(users.role, "sales"), eq(users.aktif, true)))
+    .where(and(penjualSql(), eq(users.aktif, true)))
     .orderBy(asc(users.nama));
   const [semua, targets, ren] = await Promise.all([realisasiSemua(p.dari, p.sampai), targetRentang(p.dari, p.sampai), renewal(user, { dari: p.dari, sampai: p.sampai })]);
   const urut = peringkat(semua, daftarSales.map((s) => s.id));

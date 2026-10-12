@@ -3,6 +3,8 @@ import { asc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { kategoriPolis, kontakAsuransi, perusahaanAsuransi } from "@/db/schema";
 import { FormAksi } from "@/components/form-aksi";
+import { wajibLogin } from "@/lib/auth/session";
+import { adalahOwner } from "@/lib/peran";
 import { TabMaster } from "@/app/(app)/master/tab-master";
 import { Isian, IsianPanjang, Kartu, KepalaHalaman, Kosong, Lencana, Pesan, Tombol } from "@/components/ui";
 import { formatNoWa } from "@/lib/wa";
@@ -32,7 +34,7 @@ export default async function DetailAsuransi({ params }: { params: Promise<{ id:
         jejak={[{ label: "Master data", href: "/master" }, { label: "Asuransi", href: "/master/asuransi" }, { label: a.kode }]}
         judul={a.nama}
       />
-      <TabMaster />
+      <TabMaster owner={adalahOwner((await wajibLogin("admin")).user)} />
       <div className="grid items-start gap-4 lg:grid-cols-[1fr_1.2fr]">
         <Kartu className="flex flex-col gap-4">
           <h2 className="text-base font-bold">Data perusahaan</h2>

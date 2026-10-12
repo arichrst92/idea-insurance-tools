@@ -7,14 +7,15 @@ import { FormAksi } from "@/components/form-aksi";
 import { Isian, Kartu, KepalaHalaman, Kosong, Pilihan } from "@/components/ui";
 import { STATUS_SEBELUM_TERBIT } from "@/lib/domain/journey";
 import { nonaktifkanSales } from "./actions";
+import { penjualSql } from "@/lib/peran";
 
 export const metadata = { title: "Nonaktifkan sales" };
 
 export default async function NonaktifkanSales({ params }: { params: Promise<{ id: string }> }) {
-  const { user } = await wajibLogin("admin");
+  const { user } = await wajibLogin("owner");
   const { id } = await params;
   const [s] = await db.select().from(users).where(eq(users.id, id));
-  if (!s || s.role !== "sales") notFound();
+  if (!s) notFound();
   if (!s.aktif || s.id === user.id) redirect(`/sales/${id}`);
 
   const [daftar, salesLain, [{ terbit }]] = await Promise.all([
@@ -31,7 +32,7 @@ export default async function NonaktifkanSales({ params }: { params: Promise<{ i
     db
       .select({ id: users.id, nama: users.nama })
       .from(users)
-      .where(and(eq(users.role, "sales"), eq(users.aktif, true), ne(users.id, id)))
+      .where(and(penjualSql(), eq(users.aktif, true), ne(users.id, id)))
       .orderBy(asc(users.nama)),
     db
       .select({ terbit: count() })
@@ -50,7 +51,7 @@ export default async function NonaktifkanSales({ params }: { params: Promise<{ i
   return (
     <>
       <KepalaHalaman
-        jejak={[{ label: "Sales", href: "/sales" }, { label: s.nama, href: `/sales/${id}` }, { label: "Nonaktifkan" }]}
+        jejak={[{ label: "Tim", href: "/sales" }, { label: s.nama, href: `/sales/${id}` }, { label: "Nonaktifkan" }]}
         judul="Nonaktifkan"
         sorot={s.nama}
         sub="Data tidak dihapus: riwayat polis, komisi, dan laporan tetap utuh. Bisa diaktifkan kembali kapan saja."

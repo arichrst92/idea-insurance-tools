@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import type { DataFormSales } from "./data-form";
 import { IsianRupiah } from "@/components/isian-rupiah";
 import { FormAksi, type StateForm } from "@/components/form-aksi";
 import { Isian, Pilihan } from "@/components/ui";
@@ -8,56 +9,25 @@ import { hitungKomisi, porsiKantorDenganEvent } from "@/lib/domain/komisi";
 import { RincianKomisi } from "@/components/rincian-komisi";
 import { rupiah } from "@/lib/format";
 
-export type DataFormSales = {
-  nama: string;
-  noWa: string;
-  email: string;
-  role: "admin" | "sales";
-  tipeSales: "fulltime" | "freelance" | "";
-  bagiHasilKantorPersen: number;
-  maksCashbackNasabahPersen: number;
-  gajiPokok: string;
-  targetCase: string;
-  targetRevenue: string;
-  targetUtama: "case" | "revenue";
-  namaBank: string;
-  kodeBank: string;
-  noRekening: string;
-  atasNama: string;
-};
-
-export const FORM_KOSONG: DataFormSales = {
-  nama: "",
-  noWa: "",
-  email: "",
-  role: "sales",
-  tipeSales: "fulltime",
-  bagiHasilKantorPersen: 30,
-  maksCashbackNasabahPersen: 20,
-  gajiPokok: "",
-  targetCase: "",
-  targetRevenue: "",
-  targetUtama: "revenue",
-  namaBank: "BCA",
-  kodeBank: "014",
-  noRekening: "",
-  atasNama: "",
-};
-
 export function FormSales({
   aksi,
   awal,
   tombol,
+  editorOwner,
 }: {
   aksi: (prev: StateForm, f: FormData) => Promise<StateForm>;
   awal: DataFormSales;
   tombol: string;
+  /** Hanya owner yang boleh mengatur peran staf & kebijakan (bagi hasil, maks cashback, gaji, target). */
+  editorOwner: boolean;
 }) {
   const [role, setRole] = useState(awal.role);
+  const [jugaSales, setJugaSales] = useState(awal.jugaSales);
+  const penjual = role === "sales" || (role === "owner" && jugaSales);
   const [tipe, setTipe] = useState(awal.tipeSales);
   const [bagiHasil, setBagiHasil] = useState(awal.bagiHasilKantorPersen);
   const [maksCb, setMaksCb] = useState(awal.maksCashbackNasabahPersen);
-  const fulltime = role === "sales" && tipe === "fulltime";
+  const fulltime = penjual && tipe === "fulltime";
 
   // Simulasi komisi memakai contoh polis di dokumen (premi 6 jt, cashback total 35%).
   let simulasi: ReturnType<typeof hitungKomisi> | null = null;
@@ -94,13 +64,24 @@ export function FormSales({
         <Isian label="Nama lengkap" name="nama" defaultValue={awal.nama} required />
         <Isian label="No. WhatsApp (untuk login OTP)" name="noWa" defaultValue={awal.noWa} inputMode="tel" required />
         <Isian label="Email" name="email" type="email" defaultValue={awal.email} />
-        <Pilihan label="Peran" name="role" value={role} onChange={(e) => setRole(e.target.value as "admin" | "sales")}>
-          <option value="sales">Sales</option>
-          <option value="admin">Admin / owner</option>
-        </Pilihan>
+        {editorOwner ? (
+          <Pilihan label="Peran" name="role" value={role} onChange={(e) => setRole(e.target.value as DataFormSales["role"])}>
+            <option value="sales">Sales</option>
+            <option value="admin">Admin (operasional)</option>
+            <option value="owner">Owner</option>
+          </Pilihan>
+        ) : (
+          <input type="hidden" name="role" value="sales" />
+        )}
+        {role === "owner" && (
+          <label className="flex items-center gap-2 text-sm sm:col-span-2">
+            <input type="checkbox" name="jugaSales" checked={jugaSales} onChange={(e) => setJugaSales(e.target.checked)} className="size-4 accent-ink" />
+            Juga berjualan — punya nasabah & pengajuan sendiri, komisi dihitung seperti sales
+          </label>
+        )}
       </fieldset>
 
-      {role === "sales" && (
+      {penjual && (
         <fieldset className="flex flex-col gap-3">
           <legend className="mb-3 text-base font-bold">Tipe sales</legend>
           <div className="grid gap-3 sm:grid-cols-2">
@@ -122,7 +103,11 @@ export function FormSales({
         </fieldset>
       )}
 
-      {fulltime && (
+      {fulltime && !editorOwner && (
+        <p className="rounded-xl bg-canvas px-3.5 py-2.5 text-sm text-ink-2">Target bulanan & gaji pokok sales fulltime diatur oleh owner.</p>
+      )}
+
+      {fulltime && editorOwner && (
         <fieldset className="grid gap-4 sm:grid-cols-2">
           <legend className="mb-3 text-base font-bold">Target bulan ini & gaji</legend>
           <Isian label="Target case / bulan" name="targetCase" type="number" min={1} defaultValue={awal.targetCase} required />
@@ -141,7 +126,13 @@ export function FormSales({
         </fieldset>
       )}
 
-      {role === "sales" && (
+      {penjual && !editorOwner && (
+        <p className="rounded-xl bg-canvas px-3.5 py-2.5 text-sm text-ink-2">
+          Bagi hasil kantor & batas cashback nasabah diatur oleh owner (sekarang maks cashback nasabah {awal.maksCashbackNasabahPersen}%).
+        </p>
+      )}
+
+      {penjual && editorOwner && (
         <fieldset className="grid gap-4 sm:grid-cols-2">
           <legend className="mb-3 text-base font-bold">Bagi hasil & batas cashback</legend>
           <Isian
@@ -182,7 +173,7 @@ export function FormSales({
         </fieldset>
       )}
 
-      {role === "sales" && (
+      {penjual && (
         <fieldset className="grid gap-4 sm:grid-cols-[1fr_96px_1fr_1fr]">
           <legend className="mb-3 text-base font-bold">Rekening komisi</legend>
           <Isian label="Bank" name="namaBank" defaultValue={awal.namaBank} />

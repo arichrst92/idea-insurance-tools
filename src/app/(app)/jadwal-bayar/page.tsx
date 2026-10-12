@@ -13,7 +13,8 @@ import { sesamaBca } from "@/lib/domain/jadwal";
 import { akhirDariBulan, geserBulan, namaBulanId } from "@/lib/domain/periode";
 import { tambahHari, waktuWib } from "@/lib/domain/perpanjangan";
 import { rupiah } from "@/lib/format";
-import { batalBatch, buatFileTransfer, tandaiDibayar } from "./actions";
+import { batalBatch, buatFileTransfer, setujuiFileTransfer, tandaiDibayar } from "./actions";
+import { adalahOwner } from "@/lib/peran";
 
 export const metadata = { title: "Jadwal bayar" };
 
@@ -23,6 +24,7 @@ const WARNA_JENIS = { cashback_nasabah: "bg-brand", komisi: "bg-ok", gaji: "bg-w
 
 export default async function HalamanJadwal({ searchParams }: { searchParams: Promise<{ bulan?: string }> }) {
   const sesi = await wajibLogin("admin");
+  const owner = adalahOwner(sesi.user);
   await sinkronJadwal();
   const hariIni = waktuWib().tanggal;
   const { bulan: bq } = await searchParams;
@@ -69,16 +71,20 @@ export default async function HalamanJadwal({ searchParams }: { searchParams: Pr
         sub="Cashback nasabah (lunas + 3 hari kerja), komisi sales (Jumat setelah dana asuransi cair), dan gaji fulltime (tanggal gajian). Ekspor yang siap bayar ke CSV untuk KlikBCA Bisnis."
       />
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4" data-uji="ringkasan-jadwal">
+      <div className={clsx("grid grid-cols-2 gap-3", owner && "lg:grid-cols-4")} data-uji="ringkasan-jadwal">
         <Angka label="Siap dibayar" nilai={rupiah(siap.reduce((a, x) => a + x.j.nominal, 0))} sub={`${siap.length} pembayaran${lewat.length ? ` · ${lewat.length} lewat jadwal` : ""}`} nada={lewat.length ? "warn" : undefined} />
         <Angka label="Harus dibayar s/d minggu ini" nilai={rupiah(harusMingguIni)} sub={`sampai ${minggu}, termasuk yang lewat jadwal`} />
-        <Angka
-          label="Dana tersedia"
-          nilai={rupiah(tersedia)}
-          sub={tersedia < harusMingguIni ? `Kurang ${rupiah(harusMingguIni - tersedia)} untuk jadwal minggu ini` : "Saldo kas − premi belum disetor"}
-          nada={tersedia < harusMingguIni ? "bad" : "ok"}
-        />
-        <Angka label="Saldo bisa ditarik" nilai={rupiah(pos.bisaDitarik)} href="/keuangan" />
+        {owner && (
+          <>
+            <Angka
+              label="Dana tersedia"
+              nilai={rupiah(tersedia)}
+              sub={tersedia < harusMingguIni ? `Kurang ${rupiah(harusMingguIni - tersedia)} untuk jadwal minggu ini` : "Saldo kas − premi belum disetor"}
+              nada={tersedia < harusMingguIni ? "bad" : "ok"}
+            />
+            <Angka label="Saldo bisa ditarik" nilai={rupiah(pos.bisaDitarik)} href="/keuangan" />
+          </>
+        )}
       </div>
 
       <Kartu className="flex flex-col gap-3 p-4 sm:p-5" data-uji="kalender">
@@ -193,19 +199,34 @@ export default async function HalamanJadwal({ searchParams }: { searchParams: Pr
                     <span className="text-sm">
                       <b>{b.jenisFile === "sesama_bca" ? "Sesama BCA" : "Antarbank"}</b> · {b.jumlah} transfer · <b>{rupiah(b.total)}</b>
                     </span>
-                    {b.dibayar ? <Lencana nada="ok">DIBAYAR</Lencana> : <Lencana nada="warn">{b.diekspor ? "DIEKSPOR" : "BELUM DIUNDUH"}</Lencana>}
+                    {b.dibayar ? (
+                      <Lencana nada="ok">DIBAYAR</Lencana>
+                    ) : !b.disetujui ? (
+                      <Lencana nada="bad">MENUNGGU PERSETUJUAN OWNER</Lencana>
+                    ) : (
+                      <Lencana nada="warn">{b.diekspor ? "DIEKSPOR" : "BELUM DIUNDUH"}</Lencana>
+                    )}
                   </div>
                   <div className="mt-2 flex flex-wrap items-center gap-3 text-[13px]">
-                    <a href={`/api/jadwal-bayar/${b.id}`} download className="font-semibold text-brand">
-                      Unduh CSV
-                    </a>
+                    {b.disetujui ? (
+                      <a href={`/api/jadwal-bayar/${b.id}`} download className="font-semibold text-brand">
+                        Unduh CSV
+                      </a>
+                    ) : owner ? (
+                      <FormAksi aksi={setujuiFileTransfer.bind(null, b.id)} tombol="Setujui transfer" className="flex flex-col gap-1">
+                        <span className="text-[12px] text-ink-3">Periksa daftar penerima di bawah sebelum menyetujui.</span>
+                      </FormAksi>
+                    ) : (
+                      <span className="text-ink-3">CSV bisa diunduh setelah owner menyetujui.</span>
+                    )}
                     {!b.dibayar && (
                       <form action={batalBatch.bind(null, b.id)}>
                         <button className="font-semibold text-ink-3 hover:text-bad">Batalkan</button>
                       </form>
                     )}
                   </div>
-                  {!b.dibayar && (
+                  {!b.disetujui && <RincianBatch batchId={b.id} />}
+                  {!b.dibayar && b.disetujui && (
                     <details className="mt-2">
                       <summary className="cursor-pointer text-[13px] font-semibold text-ok">Tandai dibayar</summary>
                       <div className="pt-3">
@@ -273,5 +294,27 @@ export default async function HalamanJadwal({ searchParams }: { searchParams: Pr
         </table>
       </Kartu>
     </>
+  );
+}
+
+/** Daftar penerima satu batch (untuk diperiksa owner sebelum menyetujui). */
+async function RincianBatch({ batchId }: { batchId: string }) {
+  const rows = await db
+    .select({ j: jadwalBayar, r: rekening })
+    .from(jadwalBayar)
+    .leftJoin(rekening, eq(rekening.id, jadwalBayar.rekeningId))
+    .where(eq(jadwalBayar.batchId, batchId))
+    .orderBy(asc(jadwalBayar.penerima));
+  return (
+    <ul className="mt-2 flex flex-col divide-y divide-line rounded-xl bg-canvas px-3 text-[13px]" data-uji={`rincian-${batchId}`}>
+      {rows.map(({ j, r }) => (
+        <li key={j.id} className="flex flex-wrap items-center justify-between gap-x-3 py-1.5">
+          <span className="min-w-0">
+            <b>{j.penerima}</b> <span className="text-ink-3">· {LABEL_JENIS[j.jenis]}{r ? ` · ${r.namaBank} ${r.noRekening}` : ""}</span>
+          </span>
+          <span className="font-semibold tabular-nums">{rupiah(j.nominal)}</span>
+        </li>
+      ))}
+    </ul>
   );
 }

@@ -24,7 +24,7 @@ const kelasFile =
   "w-full text-sm text-ink-2 file:mr-3 file:h-9 file:rounded-full file:border-0 file:bg-brand-soft file:px-4 file:text-sm file:font-semibold file:text-brand-ink";
 
 export default async function HalamanKeuangan({ searchParams }: { searchParams: Promise<SP & { kategori?: string }> }) {
-  const sesi = await wajibLogin("admin");
+  const sesi = await wajibLogin("owner");
   const sp = await searchParams;
   const { p } = filterDari(sp);
   const hariIni = waktuWib().tanggal;

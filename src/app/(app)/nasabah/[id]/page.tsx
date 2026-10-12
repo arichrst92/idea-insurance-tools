@@ -19,12 +19,13 @@ import {
   ubahNasabah,
   ubahStatusKendaraan,
 } from "../actions";
+import { adalahOwner, adalahStaf, penjualSql } from "@/lib/peran";
 
 export default async function DetailNasabah({ params }: { params: Promise<{ id: string }> }) {
   const { user } = await wajibLogin();
   const { id } = await params;
   const n = await nasabahMilik(user, id);
-  const admin = user.role === "admin";
+  const admin = adalahStaf(user);
 
   const daftarKendaraan = await db.select().from(kendaraan).where(eq(kendaraan.nasabahId, id)).orderBy(asc(kendaraan.dibuat));
   const kendaraanIds = daftarKendaraan.map((k) => k.id);
@@ -51,7 +52,7 @@ export default async function DetailNasabah({ params }: { params: Promise<{ id: 
       ? db
           .select({ id: users.id, nama: users.nama })
           .from(users)
-          .where(and(eq(users.role, "sales"), eq(users.aktif, true), ne(users.id, n.salesId)))
+          .where(and(penjualSql(), eq(users.aktif, true), ne(users.id, n.salesId)))
           .orderBy(asc(users.nama))
       : Promise.resolve([]),
   ]);
@@ -139,7 +140,7 @@ export default async function DetailNasabah({ params }: { params: Promise<{ id: 
             </FormAksi>
           </Kartu>
 
-          {admin && (
+          {adalahOwner(user) && (
             <Kartu className="flex flex-col gap-3">
               <h2 className="text-base font-bold">Pindah ke sales lain</h2>
               <p className="text-[13px] text-ink-3">

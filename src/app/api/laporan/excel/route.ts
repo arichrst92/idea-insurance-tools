@@ -3,14 +3,16 @@ import { sesiSekarang } from "@/lib/auth/session";
 import { agregasi, polisLunas, renewal, ringkasKlaim, total, type Agregat } from "@/lib/laporan";
 import { filterDari, type SP } from "@/app/(app)/laporan/util";
 import { catatEksporExcel } from "@/lib/ekspor/simpan";
+import { adalahOwner, adalahStaf } from "@/lib/peran";
 
 // Ekspor laporan ke Excel dengan filter yang sama seperti halaman Laporan.
-// Kolom cashback asuransi & bagian kantor hanya untuk admin.
+// Kolom cashback asuransi untuk admin & owner; bagian kantor hanya owner.
 export async function GET(req: Request) {
   const s = await sesiSekarang();
   if (!s) return new Response("Harus login", { status: 401 });
   const user = s.user;
-  const admin = user.role === "admin";
+  const admin = adalahStaf(user);
+  const owner = adalahOwner(user);
   const sp = Object.fromEntries(new URL(req.url).searchParams) as SP;
   const { p, f } = filterDari(sp);
   const [rows, ren, kl] = await Promise.all([polisLunas(user, f), renewal(user, f), ringkasKlaim(user, f)]);
@@ -33,7 +35,8 @@ export async function GET(req: Request) {
     ["Periode", `${p.label} (${p.dari} s/d ${p.sampai})`],
     ["Polis lunas", t?.polis ?? 0],
     ["Premi", t?.premi ?? 0],
-    ...(admin ? ([["Cashback asuransi", t?.cashbackTotal ?? 0], ["Bagian kantor", t?.bagianKantor ?? 0]] as [string, number][]) : []),
+    ...(admin ? ([["Cashback asuransi", t?.cashbackTotal ?? 0]] as [string, number][]) : []),
+    ...(owner ? ([["Bagian kantor", t?.bagianKantor ?? 0]] as [string, number][]) : []),
     ["Cashback nasabah", t?.cashbackNasabah ?? 0],
     [admin ? "Komisi sales" : "Komisi Anda", t?.komisi ?? 0],
     ["  dari bonus event", t?.komisiEvent ?? 0],
@@ -57,7 +60,7 @@ export async function GET(req: Request) {
       { header: "Premi", key: "premi", width: 16, style: { numFmt: RP } },
       ...(admin ? [{ header: "Cashback asuransi", key: "cashbackTotal", width: 18, style: { numFmt: RP } }] : []),
       { header: "Cashback nasabah", key: "cashbackNasabah", width: 18, style: { numFmt: RP } },
-      ...(admin ? [{ header: "Bagian kantor", key: "bagianKantor", width: 16, style: { numFmt: RP } }] : []),
+      ...(owner ? [{ header: "Bagian kantor", key: "bagianKantor", width: 16, style: { numFmt: RP } }] : []),
       { header: admin ? "Komisi sales" : "Komisi Anda", key: "komisi", width: 16, style: { numFmt: RP } },
       { header: "Dari event", key: "komisiEvent", width: 14, style: { numFmt: RP } },
     ];
@@ -83,7 +86,7 @@ export async function GET(req: Request) {
     { header: "Premi", key: "premi", width: 15, style: { numFmt: RP } },
     ...(admin ? [{ header: "Cashback asuransi", key: "cashbackTotal", width: 17, style: { numFmt: RP } }] : []),
     { header: "Cashback nasabah", key: "cashbackNasabah", width: 17, style: { numFmt: RP } },
-    ...(admin ? [{ header: "Bagian kantor", key: "bagianKantor", width: 15, style: { numFmt: RP } }] : []),
+    ...(owner ? [{ header: "Bagian kantor", key: "bagianKantor", width: 15, style: { numFmt: RP } }] : []),
     { header: admin ? "Komisi sales" : "Komisi Anda", key: "komisi", width: 15, style: { numFmt: RP } },
     { header: "Dari event", key: "komisiEvent", width: 13, style: { numFmt: RP } },
     { header: "Bayar", key: "bayar", width: 10 },

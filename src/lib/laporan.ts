@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { kategoriPolis, kendaraan, klaim, nasabah, perusahaanAsuransi, polis, users, type User } from "@/db/schema";
 import { STATUS_TERBIT } from "@/lib/perpanjangan";
 import { rasio } from "@/lib/domain/periode";
+import { adalahOwner, adalahStaf, penjualSql } from "@/lib/peran";
 
 /**
  * Definisi laporan:
@@ -45,8 +46,9 @@ export type BarisPolis = {
   komisi: number;
   komisiEvent: number;
   lunas: boolean;
-  /** Hanya admin */
+  /** Admin & owner */
   cashbackTotal?: number;
+  /** Hanya owner */
   bagianKantor?: number;
 };
 
@@ -64,7 +66,7 @@ export type Agregat = {
 
 function lingkup(user: User, f: FilterLaporan): SQL | undefined {
   return and(
-    user.role === "admin" ? (f.salesId ? eq(polis.salesId, f.salesId) : undefined) : eq(polis.salesId, user.id),
+    adalahStaf(user) ? (f.salesId ? eq(polis.salesId, f.salesId) : undefined) : eq(polis.salesId, user.id),
     f.perusahaanId ? eq(polis.perusahaanId, f.perusahaanId) : undefined,
     f.kategoriId ? eq(polis.kategoriId, f.kategoriId) : undefined,
   );
@@ -72,7 +74,7 @@ function lingkup(user: User, f: FilterLaporan): SQL | undefined {
 
 /** Polis yang lunas dalam periode (detail per baris). */
 export async function polisLunas(user: User, f: FilterLaporan): Promise<BarisPolis[]> {
-  const admin = user.role === "admin";
+  const admin = adalahStaf(user);
   const rows = await db
     .select({
       p: polis,
@@ -114,26 +116,37 @@ export async function polisLunas(user: User, f: FilterLaporan): Promise<BarisPol
     komisi: r.p.komisiSalesRp ?? 0,
     komisiEvent: r.p.komisiEventRp ?? 0,
     lunas: r.p.statusBayar === "lunas",
-    ...(admin ? { cashbackTotal: r.p.cashbackTotalRp ?? 0, bagianKantor: r.p.bagianKantorRp ?? 0 } : {}),
+    ...(admin ? { cashbackTotal: r.p.cashbackTotalRp ?? 0 } : {}),
+    // Bagian kantor hanya untuk owner (admin melihat cashback asuransi, bukan porsi kantor).
+    ...(adalahOwner(user) ? { bagianKantor: r.p.bagianKantorRp ?? 0 } : {}),
   }));
 }
 
 export function agregasi(rows: BarisPolis[], kunci: (r: BarisPolis) => [string, string], admin: boolean): Agregat[] {
   const m = new Map<string, Agregat>();
+  const kantor = rows.some((r) => r.bagianKantor !== undefined);
   for (const r of rows) {
     const [k, label] = kunci(r);
     const a =
       m.get(k) ??
-      ({ kunci: k, label, polis: 0, premi: 0, cashbackNasabah: 0, komisi: 0, komisiEvent: 0, ...(admin ? { cashbackTotal: 0, bagianKantor: 0 } : {}) } as Agregat);
+      ({
+        kunci: k,
+        label,
+        polis: 0,
+        premi: 0,
+        cashbackNasabah: 0,
+        komisi: 0,
+        komisiEvent: 0,
+        ...(admin ? { cashbackTotal: 0 } : {}),
+        ...(kantor ? { bagianKantor: 0 } : {}),
+      } as Agregat);
     a.polis++;
     a.premi += r.premi;
     a.cashbackNasabah += r.cashbackNasabah;
     a.komisi += r.komisi;
     a.komisiEvent += r.komisiEvent;
-    if (admin) {
-      a.cashbackTotal! += r.cashbackTotal ?? 0;
-      a.bagianKantor! += r.bagianKantor ?? 0;
-    }
+    if (admin) a.cashbackTotal! += r.cashbackTotal ?? 0;
+    if (kantor) a.bagianKantor! += r.bagianKantor ?? 0;
     m.set(k, a);
   }
   return [...m.values()].sort((a, b) => b.premi - a.premi || a.label.localeCompare(b.label));
@@ -216,7 +229,7 @@ export async function belumLunas(user: User, f: FilterLaporan) {
 /** Pilihan filter (sales, asuransi, paket). */
 export async function pilihanFilter(admin: boolean) {
   const [sales, asuransi, paket] = await Promise.all([
-    admin ? db.select({ id: users.id, nama: users.nama }).from(users).where(eq(users.role, "sales")).orderBy(users.nama) : Promise.resolve([]),
+    admin ? db.select({ id: users.id, nama: users.nama }).from(users).where(penjualSql()).orderBy(users.nama) : Promise.resolve([]),
     db.select({ id: perusahaanAsuransi.id, nama: perusahaanAsuransi.nama }).from(perusahaanAsuransi).orderBy(perusahaanAsuransi.nama),
     db
       .select({ id: kategoriPolis.id, nama: kategoriPolis.nama, asuransi: perusahaanAsuransi.nama })

@@ -8,6 +8,7 @@ import { aktifkanSales } from "./nonaktifkan/actions";
 import { perluVerifikasiUlang, wajibLogin } from "@/lib/auth/session";
 import { bulanIni, namaBulan } from "@/lib/format";
 import { formatNoWa } from "@/lib/wa";
+import { adalahOwner, bisaJual, labelPeran } from "@/lib/peran";
 import { FormSales } from "../form-sales";
 import { simpanSales } from "../actions";
 
@@ -19,6 +20,7 @@ export default async function EditSales({
   searchParams: Promise<{ baru?: string; nonaktif?: string }>;
 }) {
   const sesi = await wajibLogin("admin");
+  const owner = adalahOwner(sesi.user);
   const { id } = await params;
   const { baru, nonaktif } = await searchParams;
   const [u] = await db.select().from(users).where(eq(users.id, id));
@@ -35,23 +37,24 @@ export default async function EditSales({
   return (
     <>
       <KepalaHalaman
-        jejak={[{ label: "Sales", href: "/sales" }, { label: u.nama }]}
+        jejak={[{ label: "Tim", href: "/sales" }, { label: u.nama }]}
         judul={u.nama}
         sub={
           <span className="flex flex-wrap items-center gap-2">
+            <Lencana nada={u.role === "sales" ? "netral" : "brand"}>{labelPeran(u).toUpperCase()}</Lencana>
             {u.kodeSales && <Lencana nada="brand">{u.kodeSales}</Lencana>}
             {!u.aktif && <Lencana nada="bad">NONAKTIF</Lencana>}
             {formatNoWa(u.noWa)} · target {namaBulan(bulan)}
           </span>
         }
         aksi={
-          u.role === "sales" && u.id !== sesi.user.id ? (
-            <>
-            <Link href={`/performa/${id}`} className="inline-flex h-10 items-center rounded-full border border-line-2 bg-white px-5 text-sm font-semibold">
-              Performa
-            </Link>
-            {
-            u.aktif ? (
+          <>
+            {bisaJual(u) && (
+              <Link href={`/performa/${id}`} className="inline-flex h-10 items-center rounded-full border border-line-2 bg-white px-5 text-sm font-semibold">
+                Performa
+              </Link>
+            )}
+            {owner && u.id !== sesi.user.id && (u.aktif ? (
               <Link
                 href={`/sales/${id}/nonaktifkan`}
                 className="inline-flex h-10 items-center rounded-full border border-bad/30 bg-white px-5 text-sm font-semibold text-bad hover:bg-bad-soft"
@@ -62,9 +65,8 @@ export default async function EditSales({
               <form action={aktifkanSales.bind(null, id)}>
                 <Tombol varian="kedua">Aktifkan kembali</Tombol>
               </form>
-            )}
-            </>
-          ) : undefined
+            ))}
+          </>
         }
       />
       {nonaktif && <Pesan ok={`${u.nama} dinonaktifkan; ${nonaktif} nasabah sudah dialihkan dan semua sesi login dicabut.`} />}
@@ -82,8 +84,12 @@ export default async function EditSales({
           </Link>
         </p>
       )}
+      {!owner && u.role !== "sales" ? (
+        <Kartu className="max-w-4xl text-sm text-ink-2">Akun {labelPeran(u).toLowerCase()} hanya bisa diubah oleh owner.</Kartu>
+      ) : (
       <Kartu className="max-w-4xl">
         <FormSales
+          editorOwner={owner}
           aksi={simpanSales.bind(null, id)}
           tombol="Simpan perubahan"
           awal={{
@@ -91,6 +97,7 @@ export default async function EditSales({
             noWa: formatNoWa(u.noWa),
             email: u.email ?? "",
             role: u.role,
+            jugaSales: u.jugaSales,
             tipeSales: u.tipeSales ?? "",
             bagiHasilKantorPersen: u.bagiHasilKantorPersen,
             maksCashbackNasabahPersen: u.maksCashbackNasabahPersen,
@@ -105,6 +112,7 @@ export default async function EditSales({
           }}
         />
       </Kartu>
+      )}
     </>
   );
 }

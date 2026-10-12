@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { otomasiSetting } from "@/db/schema";
 import { wajibLogin } from "@/lib/auth/session";
+import { adalahOwner } from "@/lib/peran";
 import { catatAudit } from "@/lib/audit";
 import { jalankanOtomasi } from "@/lib/otomasi";
 import { cronSah } from "@/lib/domain/cron-teks";
@@ -14,8 +15,12 @@ import type { StateForm } from "@/components/form-aksi";
  * Simpan pengaturan otomasi. Parameter dibaca mengikuti tipe nilai lama:
  * angka → angka, boolean → centang, daftar angka → "30,14,7", daftar teks → centang ganda.
  */
+// Laporan berkala memuat laporan keuangan (bagian kantor, saldo): pengaturannya hanya oleh owner.
+const KHUSUS_OWNER = ["laporan_berkala"];
+
 export async function simpanOtomasi(kode: string, _: StateForm, f: FormData): Promise<StateForm> {
   const { user } = await wajibLogin("admin");
+  if (KHUSUS_OWNER.includes(kode) && !adalahOwner(user)) return { error: "Hanya owner yang bisa mengatur laporan berkala" };
   const [s] = await db.select().from(otomasiSetting).where(eq(otomasiSetting.kode, kode));
   if (!s) return { error: "Otomasi tidak ditemukan" };
   const jadwalCron = s.jadwalCron.startsWith("event:") ? s.jadwalCron : String(f.get("jadwalCron") ?? "").trim();
@@ -57,6 +62,7 @@ export async function simpanOtomasi(kode: string, _: StateForm, f: FormData): Pr
 
 export async function jalankanSekarang(kode: string): Promise<StateForm> {
   const { user } = await wajibLogin("admin");
+  if (KHUSUS_OWNER.includes(kode) && !adalahOwner(user)) return { error: "Hanya owner yang bisa menjalankan laporan berkala" };
   const h = await jalankanOtomasi(kode, { paksa: true });
   await catatAudit({ userId: user.id, aksi: "jalankan_otomasi", tabel: "otomasi_setting", recordId: kode });
   revalidatePath("/otomasi");

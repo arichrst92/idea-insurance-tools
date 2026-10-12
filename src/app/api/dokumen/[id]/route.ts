@@ -4,6 +4,7 @@ import { dokumen, kendaraan, klaim, nasabah, polis } from "@/db/schema";
 import { sesiSekarang } from "@/lib/auth/session";
 import { DOK_KHUSUS_ADMIN } from "@/lib/akses";
 import { bacaFile, tipeKonten } from "@/lib/storage";
+import { adalahStaf } from "@/lib/peran";
 
 // Unduh/lihat dokumen privat. Admin: semua. Sales: hanya dokumen nasabah miliknya
 // (dokumen polis & klaim: polis yang dipegang sales itu).
@@ -15,7 +16,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
   const [d] = await db.select().from(dokumen).where(eq(dokumen.id, id)).limit(1);
   if (!d) return new Response("Tidak ditemukan", { status: 404 });
 
-  if (s.user.role !== "admin") {
+  if (!adalahStaf(s.user)) {
     // File penawaran & bukti pencairan memuat angka dari asuransi → khusus admin.
     if (DOK_KHUSUS_ADMIN.includes(d.jenis)) return new Response("Tidak ditemukan", { status: 404 });
     let nasabahId: string | null = null;

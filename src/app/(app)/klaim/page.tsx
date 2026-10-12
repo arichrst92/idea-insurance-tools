@@ -7,6 +7,7 @@ import { wajibLogin } from "@/lib/auth/session";
 import { Kartu, KepalaHalaman, Kosong, Lencana } from "@/components/ui";
 import { STATUS_TERBIT } from "@/lib/perpanjangan";
 import { LABEL_KLAIM } from "./galeri";
+import { adalahStaf } from "@/lib/peran";
 
 export const metadata = { title: "Klaim" };
 
@@ -15,7 +16,7 @@ const TAB = { diproses: "Diproses", selesai: "Selesai", ditolak: "Ditolak", semu
 export default async function HalamanKlaim({ searchParams }: { searchParams: Promise<{ tab?: string; q?: string }> }) {
   const { user } = await wajibLogin();
   const sp = await searchParams;
-  const admin = user.role === "admin";
+  const admin = adalahStaf(user);
   const tab = (sp.tab && sp.tab in TAB ? sp.tab : "diproses") as keyof typeof TAB;
   const q = sp.q?.trim() ?? "";
   const milik = admin ? undefined : or(eq(polis.salesId, user.id), eq(nasabah.salesId, user.id));

@@ -28,7 +28,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-type Item = { href: string; label: string; ikon: LucideIcon; admin?: boolean; badge?: number };
+type Item = { href: string; label: string; ikon: LucideIcon; admin?: boolean; owner?: boolean; badge?: number };
 
 const ITEMS: Item[] = [
   { href: "/", label: "Dashboard", ikon: LayoutGrid },
@@ -42,19 +42,19 @@ const ITEMS: Item[] = [
   { href: "/performa", label: "Performa", ikon: Trophy },
   { href: "/event", label: "Event", ikon: Sparkles },
   { href: "/panduan", label: "Panduan", ikon: BookOpen },
-  { href: "/keuangan", label: "Keuangan", ikon: Landmark, admin: true },
+  { href: "/keuangan", label: "Keuangan", ikon: Landmark, admin: true, owner: true },
   { href: "/jadwal-bayar", label: "Jadwal bayar", ikon: CalendarDays, admin: true },
   { href: "/otomasi", label: "Otomasi", ikon: Zap, admin: true },
   { href: "/whatsapp", label: "WhatsApp", ikon: MessageCircle, admin: true },
   { href: "/master", label: "Master data", ikon: Database, admin: true },
-  { href: "/sales", label: "Sales", ikon: UserCog, admin: true },
+  { href: "/sales", label: "Tim", ikon: UserCog, admin: true },
 ];
 
-export function Dock({ role, nama, belumDibaca = 0 }: { role: "admin" | "sales"; nama: string; belumDibaca?: number }) {
+export function Dock({ role, label, nama, belumDibaca = 0 }: { role: "admin" | "sales" | "owner"; label: string; nama: string; belumDibaca?: number }) {
   const path = usePathname();
   const aktif = (href: string) => (href === "/" ? path === "/" : path === href || path.startsWith(href + "/"));
   const umum = ITEMS.filter((i) => !i.admin);
-  const admin = role === "admin" ? ITEMS.filter((i) => i.admin) : [];
+  const admin = role === "sales" ? [] : ITEMS.filter((i) => i.admin && (!i.owner || role === "owner"));
 
   return (
     <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex justify-center px-3 pb-3">
@@ -72,14 +72,14 @@ export function Dock({ role, nama, belumDibaca = 0 }: { role: "admin" | "sales";
         <div className="shrink-0 pb-1.5 pl-1 pt-2.5">
           <DockItem item={{ href: "/notifikasi", label: "Notifikasi", ikon: Bell, badge: belumDibaca }} aktif={aktif("/notifikasi")} />
         </div>
-        <Akun nama={nama} role={role} />
+        <Akun nama={nama} label={label} />
       </div>
     </div>
   );
 }
 
 /** Akun & keluar: selalu terlihat di ujung kanan dock (tidak ikut tergulir). */
-function Akun({ nama, role }: { nama: string; role: "admin" | "sales" }) {
+function Akun({ nama, label }: { nama: string; label: string }) {
   const [buka, setBuka] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -124,7 +124,7 @@ function Akun({ nama, role }: { nama: string; role: "admin" | "sales" }) {
             <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-brand-soft text-[12px] font-bold text-brand-ink">{inisial}</span>
             <span className="min-w-0">
               <span className="block truncate text-sm font-bold">{nama}</span>
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-3">{role}</span>
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-3">{label}</span>
             </span>
           </div>
           <form action={aksiLogout} className="border-t border-line pt-1.5">

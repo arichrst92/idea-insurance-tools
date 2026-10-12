@@ -3,6 +3,7 @@ import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { kendaraan, nasabah, perusahaanAsuransi, polis, rekening, users, type User } from "@/db/schema";
 import { sisaHari } from "@/lib/domain/perpanjangan";
+import { adalahStaf } from "@/lib/peran";
 
 /**
  * Tahap pencairan setelah nasabah lunas:
@@ -49,7 +50,7 @@ export type BarisCair = {
 const sesudahLunas = ["lunas", "premi_disetor", "cashback_cair", "selesai"] as const;
 
 export async function dataPencairan(user: User, hariIni: string) {
-  const admin = user.role === "admin";
+  const admin = adalahStaf(user);
   const rows = await db
     .select({ p: polis, nasabah: nasabah.nama, plat: kendaraan.noPolisi, sales: users.nama, asuransi: perusahaanAsuransi.nama, termin: perusahaanAsuransi.terminCashbackHari })
     .from(polis)

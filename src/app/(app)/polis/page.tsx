@@ -5,6 +5,7 @@ import { kategoriPolis, kendaraan, nasabah, perusahaanAsuransi, polis, users } f
 import { wajibLogin } from "@/lib/auth/session";
 import { Kartu, KepalaHalaman, Kosong, Lencana } from "@/components/ui";
 import { rupiah } from "@/lib/format";
+import { adalahStaf } from "@/lib/peran";
 
 export const metadata = { title: "Polis" };
 
@@ -21,7 +22,7 @@ const LABEL_MASA = {
 export default async function DaftarPolis({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
   const { user } = await wajibLogin();
   const { q = "" } = await searchParams;
-  const admin = user.role === "admin";
+  const admin = adalahStaf(user);
   const cari = q.trim();
 
   const daftar = await db

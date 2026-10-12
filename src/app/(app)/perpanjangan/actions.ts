@@ -9,6 +9,7 @@ import { wajibLogin } from "@/lib/auth/session";
 import { catatAudit } from "@/lib/audit";
 import { buatDraftPerpanjangan, GagalPerpanjangan, kirimRemindPerpanjangan } from "@/lib/perpanjangan";
 import type { StateForm } from "@/components/form-aksi";
+import { adalahStaf } from "@/lib/peran";
 
 /** Polis lama boleh diurus perpanjangannya oleh admin atau sales pemilik nasabah saat ini. */
 async function polisLamaMilik(userId: string, admin: boolean, polisId: string) {
@@ -22,7 +23,7 @@ async function polisLamaMilik(userId: string, admin: boolean, polisId: string) {
 
 export async function remindManual(polisId: string): Promise<StateForm> {
   const { user } = await wajibLogin();
-  if (!(await polisLamaMilik(user.id, user.role === "admin", polisId))) return { error: "Polis tidak ditemukan" };
+  if (!(await polisLamaMilik(user.id, adalahStaf(user), polisId))) return { error: "Polis tidak ditemukan" };
   const h = await kirimRemindPerpanjangan(polisId, { tahap: null, oleh: user.id });
   await catatAudit({ userId: user.id, aksi: "remind_perpanjangan", tabel: "polis", recordId: polisId });
   revalidatePath("/perpanjangan");
@@ -34,7 +35,7 @@ export async function remindManual(polisId: string): Promise<StateForm> {
 
 export async function perpanjang(polisId: string): Promise<StateForm> {
   const { user } = await wajibLogin();
-  if (!(await polisLamaMilik(user.id, user.role === "admin", polisId))) return { error: "Polis tidak ditemukan" };
+  if (!(await polisLamaMilik(user.id, adalahStaf(user), polisId))) return { error: "Polis tidak ditemukan" };
   let id: string;
   try {
     const d = await buatDraftPerpanjangan(polisId, user.id);

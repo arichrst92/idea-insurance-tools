@@ -149,8 +149,11 @@ export async function sinkronJadwal() {
 
 export const LABEL_JENIS = { cashback_nasabah: "Cashback nasabah", komisi: "Komisi sales", gaji: "Gaji sales" } as const;
 
-/** Buat file transfer dari baris siap bayar; dipisah sesama BCA & antarbank. */
-export async function buatBatch(ids: string[], oleh: string) {
+/**
+ * Buat file transfer dari baris siap bayar; dipisah sesama BCA & antarbank.
+ * Buatan owner langsung disetujui; buatan admin menunggu persetujuan owner.
+ */
+export async function buatBatch(ids: string[], oleh: string, olehOwner = false) {
   const rows = await db
     .select({ j: jadwalBayar, r: rekening })
     .from(jadwalBayar)
@@ -167,7 +170,14 @@ export async function buatBatch(ids: string[], oleh: string) {
     await db.transaction(async (tx) => {
       const [b] = await tx
         .insert(batchTransfer)
-        .values({ jenisFile, template: "standar-v1", jumlah: g.length, total: g.reduce((a, x) => a + x.j.nominal, 0), dibuatOleh: oleh })
+        .values({
+          jenisFile,
+          template: "standar-v1",
+          jumlah: g.length,
+          total: g.reduce((a, x) => a + x.j.nominal, 0),
+          dibuatOleh: oleh,
+          ...(olehOwner ? { disetujui: new Date(), disetujuiOleh: oleh } : {}),
+        })
         .returning({ id: batchTransfer.id });
       await tx.update(jadwalBayar).set({ status: "diekspor", batchId: b.id }).where(inArray(jadwalBayar.id, g.map((x) => x.j.id)));
       dibuat.push(b.id);
@@ -176,10 +186,20 @@ export async function buatBatch(ids: string[], oleh: string) {
   return { dibuat, tanpaRek, antarTanpaKode };
 }
 
-/** Isi CSV batch (dibuat ulang dari baris jadwal agar selalu sesuai data). */
+/** Owner menyetujui batch buatan admin. */
+export async function setujuiBatch(batchId: string, oleh: string) {
+  const [b] = await db
+    .update(batchTransfer)
+    .set({ disetujui: new Date(), disetujuiOleh: oleh })
+    .where(and(eq(batchTransfer.id, batchId), isNull(batchTransfer.disetujui), isNull(batchTransfer.dibayar)))
+    .returning();
+  return b ?? null;
+}
+
+/** Isi CSV batch (dibuat ulang dari baris jadwal agar selalu sesuai data). Hanya batch yang sudah disetujui. */
 export async function csvBatch(batchId: string) {
   const [b] = await db.select().from(batchTransfer).where(eq(batchTransfer.id, batchId));
-  if (!b) return null;
+  if (!b || !b.disetujui) return null;
   const rows = await db
     .select({ j: jadwalBayar, r: rekening, kode: polis.kode, noPolis: polis.noPolis, bulan: targetSales.bulan })
     .from(jadwalBayar)
@@ -205,6 +225,8 @@ export async function csvBatch(batchId: string) {
  * catat transfer per polis (kas + status + WA nasabah), gaji ke buku kas, lalu WA ringkasan ke tiap sales.
  */
 export async function tandaiBatchDibayar(batchId: string, p: { tgl: string; oleh: string; buktiDokumenId: string | null }) {
+  const [bt] = await db.select({ disetujui: batchTransfer.disetujui }).from(batchTransfer).where(eq(batchTransfer.id, batchId));
+  if (!bt?.disetujui) throw new Error("Batch belum disetujui owner");
   const rows = await db.select().from(jadwalBayar).where(and(eq(jadwalBayar.batchId, batchId), eq(jadwalBayar.status, "diekspor")));
   const komisiPerSales = new Map<string, { nominal: number; polis: number }>();
   for (const j of rows) {

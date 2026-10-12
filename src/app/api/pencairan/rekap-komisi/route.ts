@@ -1,11 +1,12 @@
 import { sesiSekarang } from "@/lib/auth/session";
 import { rekapKomisiSiapBayar } from "@/lib/pencairan";
 import { waktuWib } from "@/lib/domain/perpanjangan";
+import { adalahStaf } from "@/lib/peran";
 
 // Rekap komisi siap bayar per sales (CSV, admin). Format unggah BCA menyusul bersama Jadwal bayar.
 export async function GET() {
   const s = await sesiSekarang();
-  if (s?.user.role !== "admin") return new Response("Tidak diizinkan", { status: 403 });
+  if (!s || !adalahStaf(s.user)) return new Response("Tidak diizinkan", { status: 403 });
   const rows = await rekapKomisiSiapBayar();
   const tgl = waktuWib().tanggal;
   const sel = (v: string | number | null) => `"${String(v ?? "").replace(/"/g, '""')}"`;

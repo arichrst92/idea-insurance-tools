@@ -1,9 +1,10 @@
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, ne, or } from "drizzle-orm";
 import { db } from "@/db";
 import { exportJobs, users } from "@/db/schema";
 import { wajibLogin } from "@/lib/auth/session";
 import { Kartu, KepalaHalaman, Kosong, Lencana } from "@/components/ui";
 import { JENIS_EKSPOR, type JenisEkspor } from "@/lib/ekspor/antrian";
+import { adalahOwner, adalahStaf } from "@/lib/peran";
 
 export const metadata = { title: "Riwayat ekspor" };
 export const dynamic = "force-dynamic";
@@ -12,12 +13,12 @@ const jam = (d: Date) => new Intl.DateTimeFormat("id-ID", { dateStyle: "medium",
 
 export default async function RiwayatEkspor() {
   const { user } = await wajibLogin();
-  const admin = user.role === "admin";
+  const admin = adalahStaf(user);
   const daftar = await db
     .select({ j: exportJobs, nama: users.nama })
     .from(exportJobs)
     .innerJoin(users, eq(users.id, exportJobs.userId))
-    .where(admin ? undefined : eq(exportJobs.userId, user.id))
+    .where(adalahOwner(user) ? undefined : admin ? or(eq(exportJobs.userId, user.id), and(ne(users.role, "owner"), ne(exportJobs.jenisLaporan, "keuangan"))) : eq(exportJobs.userId, user.id))
     .orderBy(desc(exportJobs.dibuat))
     .limit(100);
   return (

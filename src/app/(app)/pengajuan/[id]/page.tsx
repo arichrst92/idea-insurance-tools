@@ -62,6 +62,7 @@ import {
   ubahCabang,
   simpanNilaiPertanggungan,
 } from "../actions";
+import { adalahOwner, adalahStaf } from "@/lib/peran";
 
 const hariIni = () => new Date().toISOString().slice(0, 10);
 const tglJam = (d: Date) =>
@@ -91,7 +92,8 @@ export default async function DetailPengajuan({ params }: { params: Promise<{ id
   const { user } = await wajibLogin();
   const { id } = await params;
   const p = await polisMilik(user, id);
-  const admin = user.role === "admin";
+  const admin = adalahStaf(user);
+  const owner = adalahOwner(user);
   const s: StatusPengajuan = p.statusPengajuan;
   const n = nomorLangkah(s);
 
@@ -344,10 +346,10 @@ export default async function DetailPengajuan({ params }: { params: Promise<{ id
               premi: pw.premi,
               cashbackTotalPersen: pw.cashbackTotalPersen,
             })),
-            { admin, maksCashback: info.sales.maksCashbackNasabahPersen, kantorBerlaku: bh.persen, kantorNormal: info.sales.bagiHasilKantorPersen },
+            { admin, owner, maksCashback: info.sales.maksCashbackNasabahPersen, kantorBerlaku: bh.persen, kantorNormal: info.sales.bagiHasilKantorPersen },
           )}
           admin={admin}
-          kantor={admin ? { berlaku: bh.persen, normal: info.sales.bagiHasilKantorPersen } : undefined}
+          kantor={owner ? { berlaku: bh.persen, normal: info.sales.bagiHasilKantorPersen } : undefined}
           namaEvent={namaEvent}
           tambahanEvent={bh.tambahan}
           pilihanNasabahId={p.pilihanNasabahId}
@@ -676,7 +678,7 @@ export default async function DetailPengajuan({ params }: { params: Promise<{ id
                 )}
                 <dt className="text-[#A9B0C2]">Cashback untuk nasabah ({persen(p.cashbackNasabahPersen)})</dt>
                 <dd className="text-right">{rupiah(p.cashbackNasabahRp)}</dd>
-                {admin && p.bagianKantorRp != null && (
+                {owner && p.bagianKantorRp != null && (
                   <>
                     <dt className="text-[#A9B0C2]">
                       Bagian kantor ({persen(p.bagiHasilKantorPersen)}
@@ -695,7 +697,7 @@ export default async function DetailPengajuan({ params }: { params: Promise<{ id
                     event={p.komisiEventRp ?? 0}
                     namaEvent={info.ev?.nama}
                     tambahanPersen={info.ev?.tambahanKomisiPersen}
-                    porsiSalesNormal={admin && p.bagiHasilKantorNormalPersen != null ? 100 - p.bagiHasilKantorNormalPersen : null}
+                    porsiSalesNormal={owner && p.bagiHasilKantorNormalPersen != null ? 100 - p.bagiHasilKantorNormalPersen : null}
                   />
                 </div>
               )}

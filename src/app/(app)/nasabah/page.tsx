@@ -6,6 +6,7 @@ import { wajibLogin } from "@/lib/auth/session";
 import { filterNasabah } from "@/lib/akses";
 import { Kartu, KepalaHalaman, Kosong, Lencana, TautanTombol } from "@/components/ui";
 import { formatNoWa } from "@/lib/wa";
+import { adalahStaf, penjualSql } from "@/lib/peran";
 
 export const metadata = { title: "Nasabah" };
 
@@ -20,7 +21,7 @@ export default async function DaftarNasabah({
   const sp = await searchParams;
   const q = sp.q?.trim() ?? "";
   const hal = Math.max(1, Number(sp.hal) || 1);
-  const admin = user.role === "admin";
+  const admin = adalahStaf(user);
 
   const cari = q
     ? or(
@@ -72,7 +73,7 @@ export default async function DaftarNasabah({
       .offset((hal - 1) * PER_HALAMAN),
     db.select({ total: count() }).from(nasabah).where(where),
     admin
-      ? db.select({ id: users.id, nama: users.nama, aktif: users.aktif }).from(users).where(eq(users.role, "sales")).orderBy(asc(users.nama))
+      ? db.select({ id: users.id, nama: users.nama, aktif: users.aktif }).from(users).where(penjualSql()).orderBy(asc(users.nama))
       : Promise.resolve([]),
   ]);
 

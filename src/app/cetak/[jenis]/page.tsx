@@ -14,6 +14,7 @@ import { LANGKAH, labelStatus, nomorLangkah } from "@/lib/domain/journey";
 import { geserBulan, namaBulanId, periode } from "@/lib/domain/periode";
 import { waktuWib } from "@/lib/domain/perpanjangan";
 import { angka, persen, rupiah } from "@/lib/format";
+import { adalahOwner, adalahStaf } from "@/lib/peran";
 
 // Halaman cetak A4 untuk worker PDF. Hanya bisa dibuka dengan token job yang masih berlaku.
 export const dynamic = "force-dynamic";
@@ -38,14 +39,14 @@ export default async function Cetak({ params, searchParams }: { params: Promise<
     subjudul = `${p.label} (${p.dari} s/d ${p.sampai})`;
     isi = await Laporan({ user, f: { dari: p.dari, sampai: p.sampai, salesId: f.sales || undefined, perusahaanId: f.asuransi || undefined, kategoriId: f.paket || undefined } });
   } else if (jenis === "keuangan") {
-    if (user.role !== "admin") notFound();
+    if (!adalahOwner(user)) notFound();
     const p = periode(f.periode, hariIni, f.dari, f.sampai);
     subjudul = `${p.label} (${p.dari} s/d ${p.sampai})`;
     isi = await Keuangan({ dari: p.dari, sampai: p.sampai, hariIni });
   } else if (jenis === "pengajuan") {
     const d = await daftarPengajuan(user, f);
     subjudul = `${d.label}${d.q ? ` · cari "${d.q}"` : ""} · ${d.rows.length} pengajuan`;
-    isi = <Pengajuan rows={d.rows} admin={user.role === "admin"} />;
+    isi = <Pengajuan rows={d.rows} admin={adalahStaf(user)} />;
   } else notFound();
 
   return (
@@ -62,7 +63,7 @@ export default async function Cetak({ params, searchParams }: { params: Promise<
         <div className="text-right text-[11px] text-ink-3">
           Dibuat untuk {user.nama}
           <br />
-          {user.role === "admin" ? "Admin" : "Sales"}
+          {adalahStaf(user) ? "Admin" : "Sales"}
         </div>
       </header>
       {isi}
@@ -110,7 +111,8 @@ function Kotak({ label, nilai, sub }: { label: string; nilai: string; sub?: stri
 const Judul = ({ children }: { children: ReactNode }) => <h2 className="mb-2 mt-5 text-[13px] font-bold">{children}</h2>;
 
 async function Laporan({ user, f }: { user: typeof users.$inferSelect; f: FilterLaporan }) {
-  const admin = user.role === "admin";
+  const admin = adalahStaf(user);
+  const owner = adalahOwner(user);
   const awal6 = geserBulan(f.sampai.slice(0, 8) + "01", -5);
   const [rows, rows6, ren, kl] = await Promise.all([polisLunas(user, f), polisLunas(user, { ...f, dari: awal6 < f.dari ? awal6 : f.dari }), renewal(user, f), ringkasKlaim(user, f)]);
   const t = total(rows, admin);
@@ -127,18 +129,19 @@ async function Laporan({ user, f }: { user: typeof users.$inferSelect; f: Filter
     a.label,
     angka(a.polis),
     rupiah(a.premi),
-    ...(admin ? [rupiah(a.cashbackTotal), rupiah(a.bagianKantor)] : []),
+    ...(admin ? [rupiah(a.cashbackTotal)] : []),
+    ...(owner ? [rupiah(a.bagianKantor)] : []),
     rupiah(a.cashbackNasabah),
     rupiah(a.komisi),
   ];
-  const kepala = (nama: string) => [nama, "Polis", "Premi", ...(admin ? ["Cashback asuransi", "Kantor"] : []), "Cashback nasabah", admin ? "Komisi" : "Komisi Anda"];
-  const kanan = admin ? [1, 2, 3, 4, 5, 6] : [1, 2, 3, 4];
+  const kepala = (nama: string) => [nama, "Polis", "Premi", ...(admin ? ["Cashback asuransi"] : []), ...(owner ? ["Kantor"] : []), "Cashback nasabah", admin ? "Komisi" : "Komisi Anda"];
+  const kanan = owner ? [1, 2, 3, 4, 5, 6] : admin ? [1, 2, 3, 4, 5] : [1, 2, 3, 4];
   return (
     <>
       <div className="grid grid-cols-4 gap-2">
         <Kotak label="Polis lunas" nilai={angka(t?.polis ?? 0)} sub={`${rows.filter((r) => !r.perpanjangan).length} baru · ${rows.filter((r) => r.perpanjangan).length} perpanjangan`} />
         <Kotak label="Premi" nilai={rupiah(t?.premi ?? 0)} />
-        {admin ? <Kotak label="Cashback asuransi" nilai={rupiah(t?.cashbackTotal ?? 0)} sub={`Kantor ${rupiah(t?.bagianKantor ?? 0)}`} /> : <Kotak label="Cashback nasabah" nilai={rupiah(t?.cashbackNasabah ?? 0)} />}
+        {admin ? <Kotak label="Cashback asuransi" nilai={rupiah(t?.cashbackTotal ?? 0)} sub={owner ? `Kantor ${rupiah(t?.bagianKantor ?? 0)}` : undefined} /> : <Kotak label="Cashback nasabah" nilai={rupiah(t?.cashbackNasabah ?? 0)} />}
         <Kotak label={admin ? "Komisi sales" : "Komisi Anda"} nilai={rupiah(t?.komisi ?? 0)} sub={t?.komisiEvent ? `bonus event ${rupiah(t.komisiEvent)}` : undefined} />
         <Kotak label="Renewal rate" nilai={persen(ren.rate)} sub={`${ren.diperpanjang} dari ${ren.jatuhTempo} jatuh tempo`} />
         <Kotak label="Klaim" nilai={angka(kl.total)} sub={`${kl.diproses} diproses · ${kl.selesai} selesai`} />

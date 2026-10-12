@@ -7,15 +7,15 @@ import clsx from "clsx";
 const TAB = [
   { href: "/master/asuransi", label: "Asuransi" },
   { href: "/master/bengkel", label: "Bengkel" },
-  { href: "/master/rekening", label: "Rekening kantor" },
+  { href: "/master/rekening", label: "Rekening kantor", owner: true },
 ];
 
-export function TabMaster() {
+export function TabMaster({ owner }: { owner: boolean }) {
   const path = usePathname();
   return (
     <nav aria-label="Master data" className="-mt-2">
       <ul className="flex gap-1 overflow-x-auto rounded-full border border-line bg-white p-1 text-[13px] font-semibold sm:inline-flex">
-        {TAB.map((t) => {
+        {TAB.filter((t) => owner || !t.owner).map((t) => {
           const aktif = path.startsWith(t.href);
           return (
             <li key={t.href}>

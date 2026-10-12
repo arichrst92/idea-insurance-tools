@@ -9,6 +9,7 @@ import { cabutSemuaSesi, wajibLogin } from "@/lib/auth/session";
 import { catatAudit } from "@/lib/audit";
 import { alihkanNasabah } from "@/lib/pengalihan";
 import type { StateForm } from "@/components/form-aksi";
+import { penjualSql } from "@/lib/peran";
 
 const teks = (f: FormData, k: string) => String(f.get(k) ?? "").trim();
 
@@ -17,7 +18,7 @@ const teks = (f: FormData, k: string) => String(f.get(k) ?? "").trim();
  * (default ke satu sales, bisa per nasabah), lalu semua sesi login dicabut.
  */
 export async function nonaktifkanSales(salesId: string, _: StateForm, f: FormData): Promise<StateForm> {
-  const { user } = await wajibLogin("admin");
+  const { user } = await wajibLogin("owner");
   if (salesId === user.id) return { error: "Tidak bisa menonaktifkan akun sendiri" };
   const [s] = await db.select().from(users).where(eq(users.id, salesId));
   if (!s || !s.aktif) return { error: "Sales tidak ditemukan atau sudah nonaktif" };
@@ -43,7 +44,7 @@ export async function nonaktifkanSales(salesId: string, _: StateForm, f: FormDat
     const [ok] = await db
       .select({ id: users.id })
       .from(users)
-      .where(and(eq(users.id, ke), eq(users.role, "sales"), eq(users.aktif, true)));
+      .where(and(eq(users.id, ke), penjualSql(), eq(users.aktif, true)));
     if (!ok) return { error: "Sales tujuan tidak aktif" };
   }
 
@@ -68,7 +69,7 @@ export async function nonaktifkanSales(salesId: string, _: StateForm, f: FormDat
 }
 
 export async function aktifkanSales(salesId: string) {
-  const { user } = await wajibLogin("admin");
+  const { user } = await wajibLogin("owner");
   await db.update(users).set({ aktif: true, tglNonaktif: null, alasanNonaktif: null }).where(eq(users.id, salesId));
   await catatAudit({ userId: user.id, aksi: "aktifkan", tabel: "users", recordId: salesId });
   revalidatePath("/sales");

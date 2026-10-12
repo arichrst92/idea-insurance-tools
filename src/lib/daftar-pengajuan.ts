@@ -2,6 +2,7 @@ import "server-only";
 import { and, desc, eq, ilike, inArray, notInArray, or, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
 import { kendaraan, nasabah, perusahaanAsuransi, polis, users, type StatusPengajuan, type User } from "@/db/schema";
+import { adalahStaf, bisaJual } from "@/lib/peran";
 
 /** Filter daftar pengajuan (sama dengan tab di halaman Pengajuan) — dipakai ekspor Excel & PDF. */
 export const DITUTUP: StatusPengajuan[] = ["ditolak_asuransi", "batal_nasabah", "batal_salah_input"];
@@ -9,18 +10,30 @@ export const GILIRAN: Record<"admin" | "sales", StatusPengajuan[]> = {
   sales: ["draft_prospek", "perlu_revisi", "penawaran_masuk", "polis_terbit", "menunggu_bayar"],
   admin: ["data_lengkap", "dikirim_ke_asuransi", "survei_kendaraan", "disetujui_nasabah", "lunas", "premi_disetor", "cashback_cair"],
 };
+/**
+ * Pengajuan yang menunggu tindakan user ini:
+ * - staf (admin/owner): langkah kantor di semua pengajuan;
+ * - owner merangkap sales: ditambah langkah sales di pengajuan miliknya sendiri;
+ * - sales: langkah sales (pembatasan ke miliknya sendiri dilakukan oleh filter pemanggil).
+ */
+export function whereGiliran(user: User): SQL | undefined {
+  const sales = inArray(polis.statusPengajuan, GILIRAN.sales);
+  if (!adalahStaf(user)) return sales;
+  const kantor = inArray(polis.statusPengajuan, GILIRAN.admin);
+  return bisaJual(user) ? or(kantor, and(sales, eq(polis.salesId, user.id))) : kantor;
+}
 export const LABEL_TAB = { berjalan: "Berjalan", giliran: "Giliran saya", selesai: "Selesai", ditutup: "Ditolak / batal", semua: "Semua" } as const;
 export type FilterPengajuan = { tab?: string; q?: string; sales?: string };
 
 export async function daftarPengajuan(user: User, f: FilterPengajuan, batas = 2000) {
-  const admin = user.role === "admin";
+  const admin = adalahStaf(user);
   const tab = (f.tab && f.tab in LABEL_TAB ? f.tab : "berjalan") as keyof typeof LABEL_TAB;
   const q = f.q?.trim() ?? "";
   const whereTab: SQL | undefined =
     tab === "berjalan"
       ? notInArray(polis.statusPengajuan, [...DITUTUP, "selesai"])
       : tab === "giliran"
-        ? inArray(polis.statusPengajuan, GILIRAN[user.role])
+        ? whereGiliran(user)
         : tab === "selesai"
           ? eq(polis.statusPengajuan, "selesai")
           : tab === "ditutup"

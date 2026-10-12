@@ -222,7 +222,7 @@ export async function ubahAktifBengkel(id: string, aktif: boolean) {
 // ─── Rekening pembayaran & kantor ───
 
 export async function tambahRekeningKantor(_: StateForm, form: FormData): Promise<StateForm> {
-  const { user } = await wajibLogin("admin");
+  const { user } = await wajibLogin("owner");
   const p = z
     .object({
       pemilikTipe: z.enum(["pembayaran", "kantor"]),
@@ -248,7 +248,7 @@ export async function tambahRekeningKantor(_: StateForm, form: FormData): Promis
 }
 
 export async function ubahAktifRekening(id: string, aktif: boolean) {
-  const { user } = await wajibLogin("admin");
+  const { user } = await wajibLogin("owner");
   await db.update(rekening).set({ aktif }).where(eq(rekening.id, id));
   await catatAudit({ userId: user.id, aksi: aktif ? "aktifkan" : "nonaktifkan", tabel: "rekening", recordId: id });
   revalidatePath("/master/rekening");

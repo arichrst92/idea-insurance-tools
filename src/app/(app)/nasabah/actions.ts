@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
-import { dokumen, kendaraan, nasabah, polis, rekening, users } from "@/db/schema";
+import { dokumen, kendaraan, nasabah, polis, rekening, users, type User } from "@/db/schema";
 import { wajibLogin } from "@/lib/auth/session";
 import { kendaraanMilik, nasabahMilik } from "@/lib/akses";
 import { catatAudit } from "@/lib/audit";
@@ -14,6 +14,7 @@ import { FileTidakValid, simpanFile } from "@/lib/storage";
 import { alihkanNasabah } from "@/lib/pengalihan";
 import { normalisasiPlat } from "@/lib/domain/kendaraan";
 import type { StateForm } from "@/components/form-aksi";
+import { adalahStaf, penjualSql } from "@/lib/peran";
 
 const teks = (f: FormData, k: string) => String(f.get(k) ?? "").trim();
 const opsional = (f: FormData, k: string) => teks(f, k) || null;
@@ -69,15 +70,15 @@ function bacaKendaraan(f: FormData) {
   });
 }
 
-/** Sales pemilik: sales sendiri, atau pilihan admin (harus sales aktif). */
-async function tentukanSales(user: { id: string; role: string }, f: FormData): Promise<string | { error: string }> {
-  if (user.role !== "admin") return user.id;
+/** Sales pemilik: sales sendiri, atau pilihan admin/owner (harus penjual aktif: sales atau owner merangkap sales). */
+async function tentukanSales(user: User, f: FormData): Promise<string | { error: string }> {
+  if (!adalahStaf(user)) return user.id;
   const id = teks(f, "salesId");
   if (!id) return { error: "Pilih sales pemilik nasabah" };
   const [s] = await db
     .select({ id: users.id })
     .from(users)
-    .where(and(eq(users.id, id), eq(users.role, "sales"), eq(users.aktif, true)));
+    .where(and(eq(users.id, id), penjualSql(), eq(users.aktif, true)));
   return s ? s.id : { error: "Sales tidak ditemukan atau tidak aktif" };
 }
 
@@ -274,14 +275,14 @@ export async function hapusDokumen(dokumenId: string) {
 // ─── Pindah kepemilikan (admin) ───
 
 export async function pindahKepemilikan(nasabahId: string, _: StateForm, f: FormData): Promise<StateForm> {
-  const { user } = await wajibLogin("admin");
+  const { user } = await wajibLogin("owner");
   const n = await nasabahMilik(user, nasabahId);
   const keSalesId = teks(f, "keSalesId");
   if (!keSalesId || keSalesId === n.salesId) return { error: "Pilih sales tujuan yang berbeda" };
   const [ke] = await db
     .select({ id: users.id, nama: users.nama })
     .from(users)
-    .where(and(eq(users.id, keSalesId), eq(users.role, "sales"), eq(users.aktif, true)));
+    .where(and(eq(users.id, keSalesId), penjualSql(), eq(users.aktif, true)));
   if (!ke) return { error: "Sales tujuan tidak aktif" };
 
   const { polisDipindah } = await db.transaction((tx) =>

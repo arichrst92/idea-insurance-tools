@@ -30,10 +30,11 @@ export type OpsiPenawaran = {
 /**
  * Siapkan opsi penawaran untuk dikirim ke browser. Untuk sales, cashback total dari asuransi dan
  * bagian kantor TIDAK ikut dikirim — hanya komisi per pilihan cashback nasabah.
+ * Admin menerima cashback total; bagian kantor hanya untuk owner.
  */
 export function siapkanOpsi(
   daftar: { id: string; asuransi: string; paket: string | null; cakupan: string[]; premi: number; cashbackTotalPersen: number }[],
-  p: { admin: boolean; maksCashback: number; kantorBerlaku: number; kantorNormal: number },
+  p: { admin: boolean; owner?: boolean; maksCashback: number; kantorBerlaku: number; kantorNormal: number },
 ): OpsiPenawaran[] {
   return daftar.map((x) => {
     const batas = Math.floor(Math.min(p.maksCashback, x.cashbackTotalPersen) / LANGKAH_CB) * LANGKAH_CB;
@@ -52,7 +53,8 @@ export function siapkanOpsi(
         nasabahRp: k.cashbackNasabahRp,
         komisi: k.komisiSalesRp,
         event: k.komisiEventRp,
-        ...(p.admin ? { totalRp: k.cashbackTotalRp, kantorRp: k.bagianKantorRp } : {}),
+        ...(p.admin ? { totalRp: k.cashbackTotalRp } : {}),
+        ...(p.owner ? { kantorRp: k.bagianKantorRp } : {}),
       });
     }
     return {

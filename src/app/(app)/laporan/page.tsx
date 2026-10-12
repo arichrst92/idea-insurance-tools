@@ -8,13 +8,15 @@ import { TombolPdf } from "@/components/tombol-ekspor";
 import { ChartSvg } from "@/components/chart-svg";
 import { svgBar, WARNA } from "@/lib/chart";
 import { geserBulan, namaBulanId } from "@/lib/domain/periode";
+import { adalahOwner, adalahStaf } from "@/lib/peran";
 
 export const metadata = { title: "Laporan" };
 
 
 export default async function HalamanLaporan({ searchParams }: { searchParams: Promise<SP> }) {
   const { user } = await wajibLogin();
-  const admin = user.role === "admin";
+  const admin = adalahStaf(user);
+  const owner = adalahOwner(user);
   const sp = await searchParams;
   const { p, f } = filterDari(sp);
 
@@ -49,7 +51,7 @@ export default async function HalamanLaporan({ searchParams }: { searchParams: P
     { label: "Premi", nilai: (r) => rupiah(r.premi), kanan: true },
     ...(admin ? [{ label: "Cashback asuransi", nilai: (r: Agregat) => rupiah(r.cashbackTotal), kanan: true }] : []),
     { label: "Cashback nasabah", nilai: (r) => rupiah(r.cashbackNasabah), kanan: true },
-    ...(admin ? [{ label: "Bagian kantor", nilai: (r: Agregat) => rupiah(r.bagianKantor), kanan: true }] : []),
+    ...(owner ? [{ label: "Bagian kantor", nilai: (r: Agregat) => rupiah(r.bagianKantor), kanan: true }] : []),
     { label: admin ? "Komisi sales" : "Komisi Anda", nilai: (r) => rupiah(r.komisi), kanan: true },
     { label: "dari event", nilai: (r) => (r.komisiEvent ? rupiah(r.komisiEvent) : "–"), kanan: true, className: "text-warn" },
   ];
@@ -77,7 +79,7 @@ export default async function HalamanLaporan({ searchParams }: { searchParams: P
         <Angka label="Polis lunas" nilai={angka(t?.polis ?? 0)} sub={`${baru} baru · ${(t?.polis ?? 0) - baru} perpanjangan`} />
         <Angka label="Premi" nilai={rupiah(t?.premi ?? 0)} />
         {admin ? (
-          <Angka label="Cashback asuransi" nilai={rupiah(t?.cashbackTotal ?? 0)} sub={`Kantor ${rupiah(t?.bagianKantor ?? 0)}`} />
+          <Angka label="Cashback asuransi" nilai={rupiah(t?.cashbackTotal ?? 0)} sub={owner ? `Kantor ${rupiah(t?.bagianKantor ?? 0)}` : undefined} />
         ) : (
           <Angka label="Cashback nasabah" nilai={rupiah(t?.cashbackNasabah ?? 0)} />
         )}

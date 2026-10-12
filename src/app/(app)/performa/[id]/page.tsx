@@ -7,6 +7,7 @@ import { detailPerforma } from "@/lib/performa";
 import { waktuWib } from "@/lib/domain/perpanjangan";
 import { namaBulanId } from "@/lib/domain/periode";
 import { angka, persen, rupiah } from "@/lib/format";
+import { adalahStaf, bisaJual } from "@/lib/peran";
 
 export const metadata = { title: "Detail performa" };
 
@@ -30,9 +31,9 @@ function Progres({ label, nilai, target, p, format }: { label: string; nilai: nu
 export default async function DetailPerforma({ params }: { params: Promise<{ id: string }> }) {
   const { user } = await wajibLogin();
   const { id } = await params;
-  if (user.role !== "admin" && id !== user.id) redirect(`/performa/${user.id}`);
+  if (!adalahStaf(user) && id !== user.id) redirect(`/performa/${user.id}`);
   const d = await detailPerforma(id, waktuWib().tanggal);
-  if (!d || d.sales.role !== "sales") notFound();
+  if (!d || !bisaJual(d.sales)) notFound();
   const { sales: s, sekarang: k } = d;
   const fulltime = s.tipeSales === "fulltime";
 

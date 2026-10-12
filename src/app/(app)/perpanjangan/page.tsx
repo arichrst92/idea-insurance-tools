@@ -11,6 +11,7 @@ import { LencanaStatus } from "@/components/journey";
 import { sisaHari, tambahHari, waktuWib } from "@/lib/domain/perpanjangan";
 import { LEWAT_MAKS_HARI, MASA_PERLU_DIURUS, STATUS_TERBIT, remindTerakhir } from "@/lib/perpanjangan";
 import { perpanjang, remindManual } from "./actions";
+import { adalahStaf } from "@/lib/peran";
 
 export const metadata = { title: "Perpanjangan" };
 
@@ -39,7 +40,7 @@ const tglId = (d: string | Date) =>
 export default async function HalamanPerpanjangan({ searchParams }: { searchParams: Promise<{ tab?: string; sales?: string }> }) {
   const { user } = await wajibLogin();
   const sp = await searchParams;
-  const admin = user.role === "admin";
+  const admin = adalahStaf(user);
   const tab = (sp.tab && sp.tab in TAB ? sp.tab : "semua") as keyof typeof TAB;
   const hariIni = waktuWib().tanggal;
   const lanjut = alias(polis, "lanjut");

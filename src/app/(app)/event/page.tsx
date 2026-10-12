@@ -7,6 +7,7 @@ import { Isian, Kartu, KepalaHalaman, Kosong, Lencana, Pilihan } from "@/compone
 import { persen, rupiah } from "@/lib/format";
 import { RincianKomisi } from "@/components/rincian-komisi";
 import { buatEvent, hapusEvent, ubahAktifEvent, ubahEvent } from "./actions";
+import { adalahOwner, adalahStaf, penjualSql } from "@/lib/peran";
 
 export const metadata = { title: "Event" };
 
@@ -14,7 +15,8 @@ const LABEL_BERLAKU = { semua: "Semua sales", fulltime: "Fulltime", freelance: "
 
 export default async function HalamanEvent() {
   const { user } = await wajibLogin();
-  const admin = user.role === "admin";
+  const admin = adalahStaf(user);
+  const owner = adalahOwner(user);
   const hariIni = new Date().toISOString().slice(0, 10);
 
   const [daftar, sales] = await Promise.all([
@@ -34,7 +36,7 @@ export default async function HalamanEvent() {
       ? db
           .select({ id: users.id, nama: users.nama })
           .from(users)
-          .where(and(eq(users.role, "sales"), eq(users.aktif, true)))
+          .where(and(penjualSql(), eq(users.aktif, true)))
           .orderBy(asc(users.nama))
       : Promise.resolve([]),
   ]);
@@ -98,7 +100,7 @@ export default async function HalamanEvent() {
                     <RincianKomisi untukSales={!admin} total={komisi} event={komisiEvent} namaEvent={e.nama} tambahanPersen={e.tambahanKomisiPersen} besar={false} />
                   </div>
                 )}
-                {admin && (
+                {owner && (
                   <div className="flex flex-wrap items-start gap-x-4 gap-y-2 border-t border-line pt-3">
                     <details className="w-full">
                       <summary className="cursor-pointer text-[13px] font-semibold text-brand">Ubah event</summary>
@@ -131,7 +133,10 @@ export default async function HalamanEvent() {
           })}
         </div>
 
-        {admin && (
+        {admin && !owner && (
+          <Kartu className="text-sm text-ink-2">Event dibuat dan diubah oleh owner.</Kartu>
+        )}
+        {owner && (
           <Kartu className="flex flex-col gap-4">
             <h2 className="text-base font-bold">Buat event</h2>
             <FormAksi aksi={buatEvent} tombol="Buat event" resetSetelahOk>

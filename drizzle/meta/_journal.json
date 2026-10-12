@@ -99,6 +99,13 @@
       "when": 1791643395643,
       "tag": "0013_panduan",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1791728755807,
+      "tag": "0014_owner",
+      "breakpoints": true
     }
   ]
 }

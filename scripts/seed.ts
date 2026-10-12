@@ -85,12 +85,16 @@ async function main() {
   if (noWa) {
     await db
       .insert(schema.users)
-      .values({ nama: process.env.ADMIN_NAMA ?? "Admin", noWa, role: "admin" })
+      .values({ nama: process.env.ADMIN_NAMA ?? "Owner", noWa, role: "owner" })
       .onConflictDoNothing({ target: schema.users.noWa });
-    console.log(`✓ admin ${noWa}`);
+    console.log(`✓ owner ${noWa}`);
   } else {
-    console.log("• ADMIN_NO_WA tidak diisi — admin pertama dilewati");
+    console.log("• ADMIN_NO_WA tidak diisi — akun owner pertama dilewati");
   }
+  // Peran owner baru (0014): bila belum ada owner, admin lama dijadikan owner.
+  const naik = await client`update users set role = 'owner'
+    where role = 'admin' and not exists (select 1 from users where role = 'owner') returning nama`;
+  if (naik.length) console.log(`✓ admin lama menjadi owner: ${naik.map((x) => x.nama).join(", ")}`);
 
   for (const t of TEMPLATE_WA) await db.insert(schema.waTemplate).values(t).onConflictDoNothing();
   console.log(`✓ ${TEMPLATE_WA.length} template WhatsApp`);

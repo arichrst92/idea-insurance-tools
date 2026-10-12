@@ -3,12 +3,13 @@ import { notFound } from "next/navigation";
 import { and, eq, type SQL } from "drizzle-orm";
 import { db } from "@/db";
 import { kendaraan, nasabah, polis, type User } from "@/db/schema";
+import { adalahStaf } from "@/lib/peran";
 
 // Aturan akses data: admin melihat semua; sales hanya nasabah miliknya
 // (dan kendaraan/dokumen/polis dari nasabah itu).
 
 export function filterNasabah(user: User): SQL | undefined {
-  return user.role === "admin" ? undefined : eq(nasabah.salesId, user.id);
+  return adalahStaf(user) ? undefined : eq(nasabah.salesId, user.id);
 }
 
 /** Dokumen polis yang memuat angka dari asuransi (cashback/komisi agen): hanya admin. */
@@ -41,7 +42,7 @@ export async function polisMilik(user: User, id: string) {
   const [p] = await db
     .select()
     .from(polis)
-    .where(and(eq(polis.id, id), user.role === "admin" ? undefined : eq(polis.salesId, user.id)))
+    .where(and(eq(polis.id, id), adalahStaf(user) ? undefined : eq(polis.salesId, user.id)))
     .limit(1);
   if (!p) notFound();
   return p;

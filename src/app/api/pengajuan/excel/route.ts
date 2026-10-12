@@ -3,13 +3,14 @@ import { sesiSekarang } from "@/lib/auth/session";
 import { daftarPengajuan } from "@/lib/daftar-pengajuan";
 import { catatEksporExcel } from "@/lib/ekspor/simpan";
 import { labelStatus, nomorLangkah } from "@/lib/domain/journey";
+import { adalahStaf } from "@/lib/peran";
 
 // Ekspor daftar pengajuan sesuai filter aktif (sales: miliknya sendiri). Tanpa angka cashback asuransi.
 export async function GET(req: Request) {
   const s = await sesiSekarang();
   if (!s) return new Response("Harus login", { status: 401 });
   const sp = Object.fromEntries(new URL(req.url).searchParams) as Record<string, string>;
-  const admin = s.user.role === "admin";
+  const admin = adalahStaf(s.user);
   const d = await daftarPengajuan(s.user, sp);
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet("Pengajuan");

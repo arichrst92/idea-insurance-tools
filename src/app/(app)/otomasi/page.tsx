@@ -45,7 +45,7 @@ export default async function HalamanOtomasi() {
       <KepalaHalaman
         jejak={[{ label: "Otomasi" }]}
         judul="Otomasi"
-        sub="Semua jadwal dalam WIB. Otomasi yang gagal mengirim notifikasi ke admin. Tombol Jalankan sekarang mengabaikan status aktif/nonaktif."
+        sub="Semua jadwal dalam WIB. Otomasi yang gagal mengirim notifikasi ke admin & owner. Laporan berkala (berisi keuangan) diatur owner. Tombol Jalankan sekarang mengabaikan status aktif/nonaktif."
       />
       <div className="grid items-start gap-4 lg:grid-cols-2">
         {daftar.map((s) => {
@@ -123,7 +123,7 @@ export default async function HalamanOtomasi() {
                     })}
                     {s.kode === "laporan_berkala" && (
                       <label className="flex flex-col gap-1.5 text-[13px] font-semibold text-ink-2">
-                        Penerima email (pisahkan dengan koma; kosong = email semua admin)
+                        Penerima email (pisahkan dengan koma; kosong = email semua owner)
                         <input name="penerima" defaultValue={s.penerima.join(", ")} placeholder="owner@ide.asia, keuangan@ide.asia" className="h-10 rounded-xl border border-line-2 px-3 text-sm text-ink" />
                       </label>
                     )}
